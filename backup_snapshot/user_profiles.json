@@ -1,0 +1,264 @@
+{
+  "admin": {
+    "username": "admin",
+    "password": "admin123",
+    "role": "Manager",
+    "employee_name": "Bakery Manager",
+    "profile": {
+      "full_name": "Bakery Manager",
+      "address": "",
+      "home_phone": "",
+      "mobile": "",
+      "email": "manager@brumbys.com.au",
+      "dob": "",
+      "gender": "",
+      "tfn": "",
+      "store": "Brumby's Pakenham",
+      "classification": "Full-Time",
+      "commencement_date": "",
+      "employment_level": "Store Manager",
+      "super_fund": "",
+      "super_policy": "",
+      "super_address": "",
+      "super_contact": "",
+      "super_abn": "",
+      "bank_name": "",
+      "bank_branch": "",
+      "bank_bsb": "",
+      "bank_account": "",
+      "account_name": ""
+    }
+  },
+  "ainsley.mactier": {
+    "username": "ainsley.mactier",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Ainsley Mactier",
+    "profile": {
+      "full_name": "Ainsley Brenda Mactier",
+      "address": "8 Knapton Ave, Beaconsfield Upper, Vic 3808",
+      "home_phone": "0359192106",
+      "mobile": "0479122444",
+      "email": "ainsley.mac@outlook.com",
+      "dob": "14/08/2006",
+      "gender": "Female",
+      "tfn": "520700",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "04/10/2021",
+      "employment_level": "Service Staff"
+    }
+  },
+  "elizabeth": {
+    "username": "elizabeth",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Elizabeth",
+    "profile": {
+      "full_name": "Elizabeth",
+      "dob": "30/07/2004",
+      "gender": "Female",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "03/06/2024",
+      "employment_level": "Service Staff"
+    }
+  },
+  "stella": {
+    "username": "stella",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Stella",
+    "profile": {
+      "full_name": "Stella",
+      "dob": "03/07/2007",
+      "gender": "Female",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "09/01/2024",
+      "employment_level": "Service Staff"
+    }
+  },
+  "aimi": {
+    "username": "aimi",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Aimi",
+    "profile": {
+      "full_name": "Aimi",
+      "dob": "10/11/2006",
+      "gender": "Female",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "01/10/2023",
+      "employment_level": "Service Staff"
+    }
+  },
+  "jude": {
+    "username": "jude",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Jude",
+    "profile": {
+      "full_name": "Jude",
+      "dob": "28/04/2011",
+      "gender": "Male",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "27/07/2026",
+      "employment_level": "Service Staff"
+    }
+  },
+  "aroha": {
+    "username": "aroha",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Aroha",
+    "profile": {
+      "full_name": "Aroha",
+      "dob": "24/05/2005",
+      "gender": "Female",
+      "store": "Brumby's Pakenham",
+      "classification": "part time",
+      "commencement_date": "27/09/2021",
+      "employment_level": "baker assitant"
+    }
+  },
+  "robert": {
+    "username": "robert",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Robert",
+    "profile": {
+      "full_name": "Robert",
+      "dob": "19/02/2004",
+      "gender": "Male",
+      "store": "Brumby's Pakenham",
+      "classification": "part time",
+      "commencement_date": "22/01/2024",
+      "employment_level": "baker"
+    }
+  },
+  "anastasia": {
+    "username": "anastasia",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Anastasia",
+    "profile": {
+      "full_name": "Anastasia",
+      "dob": "02/03/2000",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "04/10/2021",
+      "employment_level": "Service Staff"
+    }
+  },
+  "jack": {
+    "username": "jack",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Jack",
+    "profile": {
+      "full_name": "Jack",
+      "dob": "28/04/2011",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "27/07/2026",
+      "employment_level": "Service Staff"
+    }
+  },
+  "jane": {
+    "username": "jane",
+    "password": "TempPass123!",
+    "role": "Manager",
+    "employee_name": "Jane",
+    "profile": {
+      "full_name": "Jane",
+      "store": "Brumby's Pakenham",
+      "classification": "owner",
+      "employment_level": "Service Staff"
+    }
+  },
+  "amy": {
+    "username": "amy",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Amy",
+    "profile": {
+      "full_name": "Amy",
+      "dob": "27/02/2010",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "25/05/2026",
+      "employment_level": "Service Staff"
+    }
+  },
+  "viet": {
+    "username": "viet",
+    "password": "TempPass123!",
+    "role": "Manager",
+    "employee_name": "Viet",
+    "profile": {
+      "full_name": "Viet",
+      "store": "Brumby's Pakenham",
+      "classification": "owner",
+      "employment_level": "baker"
+    }
+  },
+  "esther.amataiti": {
+    "username": "esther.amataiti",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Esther Amataiti",
+    "profile": {
+      "full_name": "Esther Amataiti",
+      "dob": "20/09/2001",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "20/09/2021",
+      "employment_level": "Service Staff"
+    }
+  },
+  "olivia": {
+    "username": "olivia",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Olivia",
+    "profile": {
+      "full_name": "Olivia",
+      "dob": "15/01/2007",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "27/05/2024",
+      "employment_level": "Service Staff"
+    }
+  },
+  "violet": {
+    "username": "violet",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Violet",
+    "profile": {
+      "full_name": "Violet",
+      "dob": "27/02/2010",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "25/05/2026",
+      "employment_level": "Service Staff"
+    }
+  },
+  "shaelyn": {
+    "username": "shaelyn",
+    "password": "TempPass123!",
+    "role": "Employee",
+    "employee_name": "Shaelyn",
+    "profile": {
+      "full_name": "Shaelyn",
+      "dob": "25/02/2011",
+      "store": "Brumby's Pakenham",
+      "classification": "casual",
+      "commencement_date": "01/08/2026",
+      "employment_level": "Service Staff"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-11-16T17:53:01.291827",
+  "firebase_status": "No module named 'firebase_admin'",
+  "cloned_collections": {
+    "employees": {
+      "rows": 16,
+      "source": "local_data_dir"
+    },
+    "unavailability": {
+      "rows": 66,
+      "source": "local_data_dir"
+    },
+    "requirements": {
+      "rows": 13,
+      "source": "local_data_dir"
+    },
+    "fixed": {
+      "rows": 14,
+      "source": "local_data_dir"
+    },
+    "timecards": {
+      "rows": 0,
+      "source": "local_data_dir"
+    }
+  },
+  "finalized_rosters": [
+    "2026-06-29",
+    "2026-07-13",
+    "2026-07-20",
+    "2026-07-27",
+    "2026-08-10",
+    "2026-09-28",
+    "2026-10-05"
+  ],
+  "roster_drafts": [],
+  "system_docs": [
+    "user_profiles",
+    "smtp_config"
+  ],
+  "database_summary": {
+    "db_path": "C:\\Users\\quiet\\OneDrive\\Desktop\\ai for work\\project rostering\\happyrolly_web\\database\\happyrolly.db",
+    "datasets": {
+      "employees": 16,
+      "unavailability": 66,
+      "requirements": 13,
+      "fixed": 14,
+      "timecards": 0
+    },
+    "finalized_rosters_count": 7,
+    "roster_drafts_count": 0,
+    "system_docs": [
+      "user_profiles",
+      "smtp_config"
+    ]
+  }
+}
