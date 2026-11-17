@@ -115,11 +115,6 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0 ml-auto">
-        <select id="portalMode" onchange="switchPortalMode(this.value)" class="hidden sm:inline-block bg-charcoal text-white text-xs font-bold px-2.5 py-1.5 rounded-lg border border-forest cursor-pointer" title="Admin Preview Switcher">
-          <option value="manager">👔 Manager Portal</option>
-          <option value="staff">📱 Employee Portal</option>
-          <option value="kiosk">⏱️ Store Kiosk</option>
-        </select>
         <button onclick="logoutPortal()" class="bg-red-700 hover:bg-red-800 text-white text-xs font-extrabold px-3.5 py-1.5 rounded-lg shadow transition whitespace-nowrap">
           🚪 Logout
         </button>
@@ -755,13 +750,9 @@
       document.getElementById('loggedUserBadge').innerHTML =
         `Welcome back, <b>${data.display_name}</b> • <span class="bg-white/20 px-2 py-0.5 rounded-full">🟢 ${data.role} Mode Active</span>`;
 
-      const modeSel = document.getElementById('portalMode');
       if (data.role === 'Manager') {
-        modeSel.classList.remove('hidden');
-        modeSel.value = 'manager';
         switchPortalMode('manager');
       } else if (data.role === 'Employee') {
-        modeSel.classList.add('hidden');
         const staffSel = document.getElementById('staffUserSelect');
         if (staffSel) {
           staffSel.value = data.display_name;
@@ -769,7 +760,6 @@
         }
         switchPortalMode('staff');
       } else {
-        modeSel.classList.add('hidden');
         switchPortalMode('kiosk');
       }
     }
