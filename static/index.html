@@ -648,23 +648,56 @@
 
       <!-- Staff Tab 3: 2-Step Availability Logger -->
       <div id="stab-my-avail" class="hidden space-y-5">
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
-          <h3 class="text-sm font-extrabold text-spruce">📅 Step 1 &amp; 2: Log My Weekly Unavailability &amp; Date Range</h3>
-          <div id="staffAvail2StepRows" class="space-y-2 text-xs"></div>
-          <div class="grid sm:grid-cols-2 gap-3 text-xs pt-2">
-            <div>
-              <label class="font-bold block mb-1">Start Date:</label>
-              <input type="date" id="staffAvailStart" value="2026-10-01" class="w-full border rounded-lg px-3 py-1.5" />
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-5">
+          <div class="border-b border-gray-200 pb-3">
+            <h3 class="text-sm font-extrabold text-spruce">📅 Log My Weekly Unavailability &amp; Constraints</h3>
+            <p class="text-xs text-gray-500 mt-0.5">Follow the 2 steps below to submit your study, family, or personal shift constraints.</p>
+          </div>
+
+          <!-- STEP 1: DATE RANGE -->
+          <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3 text-xs">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="font-extrabold text-spruce text-xs uppercase tracking-wide">🗓️ Step 1: Input Applicable Date Range</span>
+              <div class="flex gap-1.5">
+                <button type="button" onclick="setAvailPreset('this_week')" class="bg-white hover:bg-alabaster border border-gray-300 text-charcoal text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm">This Week</button>
+                <button type="button" onclick="setAvailPreset('next_week')" class="bg-white hover:bg-alabaster border border-gray-300 text-charcoal text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm">Next Week</button>
+                <button type="button" onclick="setAvailPreset('four_weeks')" class="bg-white hover:bg-alabaster border border-gray-300 text-charcoal text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-sm">Next 4 Weeks</button>
+              </div>
             </div>
-            <div>
-              <label class="font-bold block mb-1">End Date:</label>
-              <input type="date" id="staffAvailEnd" value="2026-12-31" class="w-full border rounded-lg px-3 py-1.5" />
+            <div class="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">Start Date (From):</label>
+                <input type="date" id="staffAvailStart" class="w-full border border-gray-300 rounded-lg px-3 py-2 font-bold text-spruce bg-white" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">End Date (Until):</label>
+                <input type="date" id="staffAvailEnd" class="w-full border border-gray-300 rounded-lg px-3 py-2 font-bold text-spruce bg-white" />
+              </div>
             </div>
           </div>
-          <button onclick="submitStaffAvailability()" class="bg-forest hover:bg-spruce text-white text-xs font-extrabold px-5 py-2.5 rounded-xl shadow">📌 Save Unavailability Constraints</button>
+
+          <!-- STEP 2: CHOOSE DAYS OF THE WEEK & TIME WINDOWS -->
+          <div class="space-y-2.5 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-spruce text-xs uppercase tracking-wide">⏰ Step 2: Choose Specific Days of the Week &amp; Time Windows</span>
+              <span class="text-[11px] text-gray-500">Check day ➔ Select "All Day" or type hours</span>
+            </div>
+            <div id="staffAvail2StepRows" class="space-y-2"></div>
+          </div>
+
+          <div class="pt-2 flex justify-end">
+            <button onclick="submitStaffAvailability()" class="bg-forest hover:bg-spruce text-white text-xs font-black px-6 py-3 rounded-xl shadow transition flex items-center gap-2">
+              <span>📌 SAVE UNAVAILABILITY CONSTRAINTS</span>
+            </button>
+          </div>
         </div>
+
+        <!-- ACTIVE CONSTRAINTS LIST -->
         <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-          <h4 class="text-xs font-extrabold text-spruce uppercase mb-3">📋 My Active Logged Constraints</h4>
+          <div class="flex items-center justify-between mb-3 border-b pb-2">
+            <h4 class="text-xs font-extrabold text-spruce uppercase">📋 My Active Logged Constraints</h4>
+            <span class="text-[11px] text-gray-400">Recorded in live database</span>
+          </div>
           <div id="staffActiveConstraintsList" class="space-y-2 text-xs"></div>
         </div>
       </div>
@@ -1712,10 +1745,48 @@
         : '<div class="text-emerald-700 font-semibold">🎉 You have no logged unavailability constraints!</div>';
     }
 
+    function setAvailPreset(preset) {
+      const today = new Date();
+      let start = new Date(today);
+      let end = new Date(today);
+
+      if (preset === 'this_week') {
+        const day = today.getDay(); // 0 is Sun, 1 is Mon
+        const diffToMon = (day === 0 ? -6 : 1) - day;
+        start.setDate(today.getDate() + diffToMon);
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+      } else if (preset === 'next_week') {
+        const day = today.getDay();
+        const diffToMon = (day === 0 ? 1 : 8) - day;
+        start.setDate(today.getDate() + diffToMon);
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+      } else if (preset === 'four_weeks') {
+        const day = today.getDay();
+        const diffToMon = (day === 0 ? -6 : 1) - day;
+        start.setDate(today.getDate() + diffToMon);
+        end = new Date(start);
+        end.setDate(start.getDate() + 27);
+      }
+
+      const toIso = d => d.toISOString().slice(0, 10);
+      document.getElementById('staffAvailStart').value = toIso(start);
+      document.getElementById('staffAvailEnd').value = toIso(end);
+    }
+
     async function submitStaffAvailability() {
       const empName = document.getElementById('staffUserSelect').value;
       const sDate = document.getElementById('staffAvailStart').value;
       const eDate = document.getElementById('staffAvailEnd').value;
+
+      if (!sDate || !eDate) {
+        return alert('Please select both a Start Date and End Date in Step 1.');
+      }
+      if (sDate > eDate) {
+        return alert('Step 1 Error: The Start Date cannot be after the End Date.');
+      }
+
       const rangeNote = `From ${sDate} to ${eDate}`;
       let added = 0;
       DAYS.forEach(d => {
@@ -1727,7 +1798,7 @@
           added++;
         }
       });
-      if (!added) return alert('Please check at least one day in Step 1.');
+      if (!added) return alert('Please check at least one day of the week in Step 2.');
       await saveDataset('unavailability');
       refreshStaffPortal();
     }
