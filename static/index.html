@@ -29,6 +29,8 @@
     .cell-input:focus { outline: 2px solid #539127; background: #f0fdf4; }
     .roster-compact-table { table-layout: fixed !important; width: 100% !important; }
     .roster-compact-table th, .roster-compact-table td { overflow: hidden; text-overflow: ellipsis; word-break: break-word; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     body.phone-preview-mode { background-color: #1a221d; align-items: center; padding: 16px 0; }
     body.phone-preview-mode header,
     body.phone-preview-mode nav,
@@ -124,28 +126,46 @@
 
   <!-- Manager Navigation Bar (8 Tabs) -->
   <nav id="managerNav" class="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 py-2 flex flex-wrap gap-1.5 text-xs font-semibold">
-      <button onclick="showTab('dash')" id="btn-dash" class="tab-btn tab-active px-3 py-2 rounded-lg transition">🏠 Home / Dashboard</button>
-      <button onclick="showTab('roster')" id="btn-roster" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition">📅 Roster Inside</button>
-      <button onclick="showTab('gen')" id="btn-gen" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition">⚡ Weekly Roster Generator</button>
-      <button onclick="showTab('emp')" id="btn-emp" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition">👥 Staff Members</button>
-      <button onclick="showTab('unavail')" id="btn-unavail" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition">🚫 Unavailability (Grid)</button>
-      <button onclick="showTab('req')" id="btn-req" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition">📋 Daily Requirements</button>
-      <button onclick="showTab('fixed')" id="btn-fixed" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition">📌 Fixed Shifts</button>
-      <button onclick="showTab('audit')" id="btn-audit" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition">⏱️ Shift Timesheet Audit</button>
+    <!-- Mobile: Compact 1-Row Dropdown (Saves ~120px of vertical height) -->
+    <div class="sm:hidden px-3 py-2 flex items-center justify-between gap-2 bg-white">
+      <div class="flex items-center gap-1.5 shrink-0 text-spruce font-black text-xs">
+        <span>📑 Menu:</span>
+      </div>
+      <select id="mobileTabSelect" onchange="showTab(this.value)" class="w-full bg-alabaster border border-gray-300 text-spruce text-xs font-bold rounded-lg px-3 py-2 focus:outline-none focus:border-forest shadow-sm cursor-pointer">
+        <option value="dash">🏠 Home / Dashboard</option>
+        <option value="roster">📅 Roster Inside</option>
+        <option value="gen">⚡ Weekly Roster Generator</option>
+        <option value="emp">👥 Staff Members</option>
+        <option value="unavail">🚫 Unavailability (Grid)</option>
+        <option value="req">📋 Daily Requirements</option>
+        <option value="fixed">📌 Fixed Shifts</option>
+        <option value="audit">⏱️ Shift Timesheet Audit</option>
+      </select>
+    </div>
+
+    <!-- Tablet / Desktop: Horizontal Pill Strip -->
+    <div class="hidden sm:flex max-w-7xl mx-auto px-4 py-2 overflow-x-auto whitespace-nowrap gap-1.5 text-xs font-semibold no-scrollbar">
+      <button onclick="showTab('dash')" id="btn-dash" class="tab-btn tab-active px-3 py-2 rounded-lg transition shrink-0">🏠 Home / Dashboard</button>
+      <button onclick="showTab('roster')" id="btn-roster" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition shrink-0">📅 Roster Inside</button>
+      <button onclick="showTab('gen')" id="btn-gen" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition shrink-0">⚡ Weekly Roster Generator</button>
+      <button onclick="showTab('emp')" id="btn-emp" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition shrink-0">👥 Staff Members</button>
+      <button onclick="showTab('unavail')" id="btn-unavail" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition shrink-0">🚫 Unavailability (Grid)</button>
+      <button onclick="showTab('req')" id="btn-req" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition shrink-0">📋 Daily Requirements</button>
+      <button onclick="showTab('fixed')" id="btn-fixed" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition shrink-0">📌 Fixed Shifts</button>
+      <button onclick="showTab('audit')" id="btn-audit" class="tab-btn px-3 py-2 rounded-lg hover:bg-alabaster transition shrink-0">⏱️ Shift Timesheet Audit</button>
     </div>
   </nav>
 
   <!-- Employee Navigation Bar (3 Tabs) -->
   <nav id="staffNav" class="hidden bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
-      <div class="flex gap-1.5">
-        <button onclick="showStaffTab('my-roster')" id="sbtn-my-roster" class="stab-btn tab-active px-3.5 py-2 rounded-lg transition">📅 Current Roster & Break Rules</button>
-        <button onclick="showStaffTab('my-info')" id="sbtn-my-info" class="stab-btn px-3.5 py-2 rounded-lg hover:bg-alabaster transition">📋 Personal Information Form</button>
-        <button onclick="showStaffTab('my-avail')" id="sbtn-my-avail" class="stab-btn px-3.5 py-2 rounded-lg hover:bg-alabaster transition">📅 My Availability & Constraints</button>
+    <div class="max-w-7xl mx-auto px-4 py-2 flex flex-nowrap overflow-x-auto items-center justify-between gap-2 text-xs font-semibold no-scrollbar">
+      <div class="flex gap-1.5 shrink-0">
+        <button onclick="showStaffTab('my-roster')" id="sbtn-my-roster" class="stab-btn tab-active px-3 py-1.5 rounded-lg transition whitespace-nowrap">📅 Roster &amp; Breaks</button>
+        <button onclick="showStaffTab('my-info')" id="sbtn-my-info" class="stab-btn px-3 py-1.5 rounded-lg hover:bg-alabaster transition whitespace-nowrap">📋 Info Form</button>
+        <button onclick="showStaffTab('my-avail')" id="sbtn-my-avail" class="stab-btn px-3 py-1.5 rounded-lg hover:bg-alabaster transition whitespace-nowrap">🚫 Availability</button>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-gray-500">Viewing as Staff:</span>
+      <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+        <span class="text-gray-500 text-[11px] hidden sm:inline">Viewing:</span>
         <select id="staffUserSelect" onchange="refreshStaffPortal()" class="border border-gray-300 rounded-lg px-2.5 py-1 text-xs font-bold text-spruce"></select>
       </div>
     </div>
@@ -889,6 +909,9 @@
       document.querySelectorAll('#managerNav .tab-btn').forEach(b => b.classList.remove('tab-active'));
       const btn = document.getElementById('btn-' + tabId);
       if (btn) btn.classList.add('tab-active');
+
+      const mSel = document.getElementById('mobileTabSelect');
+      if (mSel && mSel.value !== tabId) mSel.value = tabId;
 
       ['dash', 'roster', 'gen', 'emp', 'unavail', 'req', 'fixed', 'audit', 'staff-portal', 'kiosk'].forEach(id => {
         const el = document.getElementById('tab-' + id);
