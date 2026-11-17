@@ -795,6 +795,14 @@ def generate_xero_autofill_js_str(hour_breakdown: List[Dict[str, Any]]) -> str:
 }})();"""
 
 
+def calculate_age_from_dob(dob_val: Any, ref_date: Optional[date] = None) -> Optional[int]:
+    dt = parse_date_robust(dob_val)
+    if not dt:
+        return None
+    today = ref_date or date.today()
+    return today.year - dt.year - ((today.month, today.day) < (dt.month, dt.day))
+
+
 def calculate_wages_records(
     roster_rows: List[Dict[str, Any]],
     employees: List[Dict[str, Any]],
@@ -807,12 +815,14 @@ def calculate_wages_records(
         name = str(nr.get("name") or nr.get("employee") or "").strip()
         if not name:
             continue
-        age = KNOWN_AGES.get(name.lower(), 21)
-        try:
-            if nr.get("age"):
-                age = int(float(str(nr["age"])))
-        except ValueError:
-            pass
+        age = calculate_age_from_dob(nr.get("dob") or nr.get("date of birth"))
+        if age is None:
+            age = KNOWN_AGES.get(name.lower(), 21)
+            try:
+                if nr.get("age"):
+                    age = int(float(str(nr["age"])))
+            except ValueError:
+                pass
         status = str(nr.get("employment type") or nr.get("status") or "Casual").strip().lower()
         role = str(nr.get("role") or nr.get("position") or "Service").strip()
         emp_meta[name.lower()] = {"name": name, "age": age, "status": status, "role": role}

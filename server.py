@@ -3,7 +3,7 @@ import io
 import json
 import os
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -29,6 +29,7 @@ from core_engine import (
     is_vic_school_holiday,
     parse_date_robust,
     parse_shift_range,
+    parse_time_to_decimal,
     solve_roster_records,
     sort_records_by_team_and_age,
 )
@@ -37,12 +38,27 @@ db = HappyRollyDB()
 STATIC_DIR = os.path.join(HAPPYROLLY_DIR, "static")
 
 
+def get_melbourne_now() -> datetime:
+    """Returns the current datetime in Melbourne (AEDT UTC+11 / AEST UTC+10)."""
+    try:
+        import zoneinfo
+        return datetime.now(zoneinfo.ZoneInfo("Australia/Melbourne"))
+    except Exception:
+        utc_now = datetime.now(timezone.utc)
+        m = utc_now.month
+        # Melbourne DST (AEDT UTC+11) from 1st Sunday in October to 1st Sunday in April
+        offset_hrs = 11 if (m >= 10 or m <= 3) else 10
+        return utc_now + timedelta(hours=offset_hrs)
+
+
 def build_timesheet_audit_records() -> dict:
     """Replicates render_manager_timesheet_audit_dashboard logic from app.py."""
     timecards = db.load_records("timecards") or []
     rosters_meta = db.list_finalized_rosters()
-    today_dt = date.today()
+    melb_now = get_melbourne_now()
+    today_dt = melb_now.date()
     today_str = today_dt.strftime("%d/%m/%Y")
+    now_dec = melb_now.hour + (melb_now.minute / 60.0)
 
     # Build scheduled shift lookup from latest finalized rosters
     sched_map = {}
@@ -76,11 +92,68 @@ def build_timesheet_audit_records() -> dict:
         c_out = str(tc.get("Clock Out", "")).strip()
         note = str(tc.get("Note", "")).strip()
         status = str(tc.get("Status", "Completed")).strip()
-        if not c_in and status != "Approved":
-            note = "⚠️ Missing Clock-In"
-            status = "Missing"
-        elif c_in and not c_out and status != "Working":
-            note = "⚠️ Missing Clock-Out"
+
+        r_d_obj = parse_date_robust(d_s)
+        is_today = bool(r_d_obj and r_d_obj == today_dt)
+        is_past = bool(r_d_obj and r_d_obj < today_dt)
+
+        # Dynamic Status and Note calculation matching app.py
+        if "Approved" in note or "Rejected" in note or status in ("Approved", "Rejected"):
+            pass
+        elif not c_in:
+            if is_today:
+                shift_r = parse_shift_range(sched)
+                s_start = shift_r[0] if shift_r else None
+                if s_start is not None and now_dec < s_start + 0.25:
+                    note = "⏳ Scheduled Today"
+                    status = "Scheduled"
+                else:
+                    note = "⚠️ Missing Clock-In"
+                    status = "Missing"
+            else:
+                note = "⚠️ Missing Clock-In"
+                status = "Missing"
+        elif c_in and not c_out:
+            if is_past:
+                # Past days with no clock-out are missing records, NOT currently working today!
+                note = "⚠️ Missing Clock-Out"
+                status = "Missing"
+            elif is_today:
+                shift_r = parse_shift_range(sched)
+                s_end = shift_r[1] if shift_r else None
+                if s_end is not None and now_dec >= s_end + 0.25:
+                    note = "⚠️ Missing Clock-Out"
+                    status = "Working"
+                elif sched and "-" in sched:
+                    sched_start_str = sched.split("-")[0].strip()
+                    c_in_dec = parse_time_to_decimal(c_in)
+                    s_in_dec = parse_time_to_decimal(sched_start_str)
+                    var_mins = round((c_in_dec - s_in_dec) * 60)
+                    if var_mins >= 10:
+                        note = f"⚠️ Late Clocking (+{var_mins} mins)"
+                    else:
+                        note = "🟢 Working Now"
+                    status = "Working"
+                else:
+                    note = "🟢 Working Now"
+                    status = "Working"
+            else:
+                note = "⚠️ Missing Clock-Out"
+                status = "Missing"
+        elif c_in and c_out:
+            status = "Completed"
+            if sched and "-" in sched and "Approved" not in note and "Rejected" not in note:
+                sched_start_str = sched.split("-")[0].strip()
+                c_in_dec = parse_time_to_decimal(c_in)
+                s_in_dec = parse_time_to_decimal(sched_start_str)
+                var_mins = round((c_in_dec - s_in_dec) * 60)
+                if var_mins >= 10:
+                    note = f"⚠️ Late Clocking (+{var_mins} mins)"
+                elif not note or note == "Working":
+                    note = "✅ Verified / Normal"
+            elif not note or note == "Working":
+                note = "✅ Verified / Normal"
+
         audit_rows.append(
             {
                 "Record ID": tc.get("Record ID") or f"TC_{idx+1}",
@@ -130,14 +203,20 @@ def build_timesheet_audit_records() -> dict:
 
     audit_rows.sort(key=lambda x: (x["week_key"], x["sort_date"]), reverse=True)
 
-    working_cnt = sum(1 for r in audit_rows if r["Status"] == "Working")
-    late_cnt = sum(1 for r in audit_rows if "Late" in r["Note"])
-    missing_cnt = sum(1 for r in audit_rows if "Missing" in r["Note"])
+    # Crucial Fix: Only count employees actively clocked in TODAY for "ON DUTY TODAY"
+    working_today_cnt = sum(1 for r in audit_rows if r["Status"] == "Working" and r.get("Date") == today_str)
+    late_today_cnt = sum(1 for r in audit_rows if "Late" in r["Note"] and r.get("Date") == today_str)
+    missing_today_cnt = sum(1 for r in audit_rows if "Missing" in r["Note"] and r.get("Date") == today_str)
+
+    total_missing_cnt = sum(1 for r in audit_rows if "Missing" in r["Note"])
+    total_late_cnt = sum(1 for r in audit_rows if "Late" in r["Note"])
 
     return {
-        "working_count": working_cnt,
-        "late_count": late_cnt,
-        "missing_count": missing_cnt,
+        "working_count": working_today_cnt,
+        "late_count": late_today_cnt,
+        "missing_count": missing_today_cnt,
+        "total_missing_count": total_missing_cnt,
+        "total_late_count": total_late_cnt,
         "total_records": len(audit_rows),
         "records": audit_rows,
     }
@@ -215,11 +294,12 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
                 for h in VIC_SCHOOL_HOLIDAYS
             ]
             audit = build_timesheet_audit_records()
+            melb_now = get_melbourne_now()
             self._send_json(
                 200,
                 {
                     "ok": True,
-                    "today_str": datetime.now().strftime("%d/%m/%Y"),
+                    "today_str": melb_now.strftime("%d/%m/%Y"),
                     "stats": stats,
                     "rosters": rosters,
                     "drafts": drafts,
@@ -229,6 +309,8 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
                         "working_count": audit["working_count"],
                         "late_count": audit["late_count"],
                         "missing_count": audit["missing_count"],
+                        "total_missing_count": audit["total_missing_count"],
+                        "total_late_count": audit["total_late_count"],
                     },
                     "public_holidays": holidays,
                     "school_holidays": school_terms,

@@ -764,7 +764,7 @@
 
       const alertsEl = document.getElementById('dashAlerts');
       alertsEl.innerHTML = `
-        <div class="p-2.5 rounded-lg bg-emerald-950/80 border border-emerald-500 text-emerald-200 font-semibold">✅ Attendance Status: ${data.audit_summary.working_count} working now • ${data.audit_summary.late_count} late • ${data.audit_summary.missing_count} missing clock-ins.</div>
+        <div class="p-2.5 rounded-lg bg-emerald-950/80 border border-emerald-500 text-emerald-200 font-semibold">✅ Attendance Status: ${data.audit_summary.working_count} on duty today • ${data.audit_summary.late_count} late today • ${data.audit_summary.missing_count} missing punches today.</div>
         <div class="p-2.5 rounded-lg bg-teal-950/80 border border-gold/50 text-amber-200 font-semibold">📩 Unavailability Records: ${data.stats.datasets.unavailability || 0} staff availability constraints logged in database.</div>
       `;
 
