@@ -1619,6 +1619,7 @@
           <div class="flex flex-wrap items-center gap-3 pt-2">
             <button onclick="saveConfidentialProfile('${userKey}')" class="bg-forest hover:bg-spruce text-white font-extrabold px-5 py-2 rounded-lg shadow">💾 Save Confidential Profile Information</button>
             <button onclick="resendWelcomeEmail('${userKey}')" class="bg-amber-600 hover:bg-amber-700 text-white font-extrabold px-5 py-2 rounded-lg shadow">📧 Resend Welcome Email</button>
+            <button onclick="deleteUserProfile('${userKey}', '${(p.full_name || empName).replace(/'/g, "\\'")}')" class="bg-red-600 hover:bg-red-700 text-white font-extrabold px-5 py-2 rounded-lg shadow">🗑️ Delete This Login Account</button>
           </div>
         </div>
       `;
@@ -1698,6 +1699,28 @@
         }
       } catch (e) {
         alert(`Error sending email: ${e.message}`);
+      }
+    }
+
+    async function deleteUserProfile(userKey, empName) {
+      if (!confirm(`Are you sure you want to delete the login account for '${userKey}' (${empName})?\n\nThis will remove their user login credentials while leaving roster records intact.`)) return;
+
+      try {
+        const res = await fetch('/api/profiles/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_key: userKey })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          profilesCache = data.profiles || {};
+          populateAdminProfileSelect();
+          alert(`✅ Account '${userKey}' has been deleted.`);
+        } else {
+          alert(`Error: ${data.error || data.message}`);
+        }
+      } catch (e) {
+        alert(`Error deleting account: ${e.message}`);
       }
     }
 

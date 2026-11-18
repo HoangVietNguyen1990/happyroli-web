@@ -779,6 +779,17 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "profiles": profiles})
             return
 
+        if path == "/api/profiles/delete":
+            user_key = str(body.get("user_key", "")).strip().lower()
+            profiles = db.load_system_doc("user_profiles") or {}
+            if user_key in profiles:
+                del profiles[user_key]
+                db.save_system_doc("user_profiles", profiles)
+                self._send_json(200, {"ok": True, "message": f"Deleted login account '{user_key}'.", "profiles": profiles})
+            else:
+                self._send_json(404, {"ok": False, "error": f"Account '{user_key}' not found."})
+            return
+
         if path == "/api/profiles/autocreate":
             employees = db.load_records("employees") or []
             profiles = db.load_system_doc("user_profiles") or {}
