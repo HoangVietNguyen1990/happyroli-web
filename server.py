@@ -467,11 +467,14 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _read_json_body(self) -> dict:
-        length = int(self.headers.get("Content-Length", "0"))
-        if length <= 0:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0:
+                return {}
+            raw = self.rfile.read(length).decode("utf-8", errors="replace")
+            return json.loads(raw) if raw else {}
+        except Exception:
             return {}
-        raw = self.rfile.read(length).decode("utf-8")
-        return json.loads(raw) if raw else {}
 
     def do_OPTIONS(self):
         self._send_json(200, {"ok": True})
