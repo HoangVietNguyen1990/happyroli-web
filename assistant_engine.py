@@ -88,7 +88,7 @@ PHONETIC_ALIASES = {
     "Jack": ["jack", "dách", "dzắc", "giắc", "dắt", "zắc", "giắt"],
     "Olivia": ["olivia", "ô li via", "li via", "ô li", "ô-li", "o li via"],
     "Shaelyn": ["shaelyn", "sê lin", "se lin", "sa lin", "sơ lin", "sa e lin", "sa-lin", "se-lin", "xe lin", "shaelynn"],
-    "Aroha": ["aroha", "a rô ha", "a ro ha", "ro ha", "a lô ha", "a-ro-ha"],
+    "Aroha": ["aroha", "aloha", "a rô ha", "a ro ha", "ro ha", "a lô ha", "a-ro-ha", "a lo ha", "lo ha"],
     "Viet": ["viet", "việt", "anh việt"],
     "Jude": ["jude", "dút", "dút đơ", "giu đê", "giu đe"],
 }
@@ -252,6 +252,57 @@ def parse_time_range(text: str) -> Optional[str]:
         t2 = f"{h2:02d}:{m2}"
         return f"{t1} - {t2}"
     return None
+
+
+def parse_start_end_time_adjustment(msg: str, current_shift: str) -> Optional[str]:
+    """
+    Parses single start-time or end-time adjustments e.g.:
+    'Chỉnh giờ bắt đầu của Aloha vào ngày thứ tư từ 6 giờ thành 7 giờ'
+    'Chỉnh giờ bắt đầu vào ngày thứ tư của Aloha thành 7 giờ'
+    'đổi giờ vào thành 7h'
+    'cho về lúc 2h chiều'
+    """
+    low = msg.lower()
+    norm = re.sub(r"(\d{1,2})\s*giờ", r"\1h", low)
+    m_from_to = re.search(r"từ\s*(\d{1,2})h?\s*thành\s*(\d{1,2})h?", norm)
+    m_target = re.search(r"(?:thành|lúc|sang|đến|lên|thành ca)\s*(\d{1,2})(?:h(\d{2})?|:(\d{2}))?\s*(sáng|trưa|chiều|tối)?", norm)
+
+    target_h = None
+    target_m = "00"
+    if m_from_to:
+        target_h = int(m_from_to.group(2))
+    elif m_target:
+        target_h = int(m_target.group(1))
+        target_m = m_target.group(2) or m_target.group(3) or "00"
+        p = m_target.group(4) or ""
+        if p in ["chiều", "tối"] and target_h < 12:
+            target_h += 12
+
+    if target_h is None:
+        return None
+
+    is_start = any(k in low for k in ["bắt đầu", "vào", "vô", "vào ca", "mở", "bắt đầu từ"])
+    is_end = any(k in low for k in ["kết thúc", "về", "hết ca", "đóng", "tan"])
+
+    m_cur = re.search(r"(\d{1,2}):?(\d{2})?\s*(?:am|pm)?\s*[-–]\s*(\d{1,2}):?(\d{2})?\s*(?:am|pm)?", current_shift or "", re.IGNORECASE)
+    if m_cur:
+        cur_h1 = int(m_cur.group(1))
+        cur_m1 = m_cur.group(2) or "00"
+        cur_h2 = int(m_cur.group(3))
+        cur_m2 = m_cur.group(4) or "00"
+
+        cur_low = (current_shift or "").lower()
+        if "pm" in cur_low and cur_h2 < 12 and cur_h2 <= cur_h1:
+            cur_h2 += 12
+        elif cur_h2 < cur_h1 and cur_h2 < 12:
+            cur_h2 += 12
+
+        if is_start or (not is_end and target_h < cur_h2):
+            return f"{target_h:02d}:{target_m} - {cur_h2:02d}:{cur_m2}"
+        elif is_end or target_h > cur_h1:
+            return f"{cur_h1:02d}:{cur_m1} - {target_h:02d}:{target_m}"
+
+    return f"{target_h:02d}:{target_m} - {target_h+5:02d}:{target_m}"
 
 
 def execute_roster_action(
@@ -511,12 +562,19 @@ def parse_intent_rule_based(
         if any(k in msg for k in ["nghỉ", "off", "bỏ ca", "xóa ca", "cho nghỉ", "bỏ", "xóa"]):
             return "remove_shift", {"emp": emp, "day": day or prev_day or "Saturday"}
 
-        # 2. Adjust hours / Add shift with time
+        # 2. Adjust hours / Add shift with time (full range)
         if time_str:
             return "adjust_shift_hours", {"emp": emp, "day": day or prev_day or "Monday", "shift_time": time_str}
 
-        # 3. Query / Prompt shift
-        if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "đổi", "thay đổi", "xem ca", "ca", "thêm", "thêm ca", "1k", "1 k", "làm ca", "làm", "xếp", "xếp ca"]):
+        # 3. Adjust hours (single start or end time change e.g. "chỉnh giờ bắt đầu thành 7 giờ" / "từ 6 giờ thành 7 giờ")
+        row = next((r for r in roster_rows if str(r.get("Employee") or "").lower() == emp.lower()), None)
+        cur_shift = row.get(day or prev_day or "Wednesday", "") if row else ""
+        adj_time = parse_start_end_time_adjustment(msg, cur_shift)
+        if adj_time:
+            return "adjust_shift_hours", {"emp": emp, "day": day or prev_day or "Wednesday", "shift_time": adj_time}
+
+        # 4. Query / Prompt shift
+        if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "chỉnh", "sửa", "đổi", "thay đổi", "xem ca", "ca", "thêm", "thêm ca", "1k", "1 k", "làm ca", "làm", "xếp", "xếp ca", "giờ"]):
             return "query_or_prompt_shift", {"emp": emp, "day": day or prev_day or "Monday"}
 
     # Case D: Preference instruction
@@ -531,9 +589,14 @@ def parse_intent_rule_based(
             "notes": user_message,
         }
 
-    # Case E: Greeting or mic check
-    if any(k in msg for k in ["hello", "chào", "joy ơi", "em ơi", "alo", "hi joy", "troy", "không nói gì", "sao không nói", "sao nó không nói", "im re"]):
-        return "greeting", {"raw": user_message}
+    # Case E: Greeting or mic check (ONLY when no employee was mentioned)
+    if not found_emps:
+        greeting_patterns = [
+            r"\bhello\b", r"\bhi\b", r"\bchào\b", r"\bjoy ơi\b", r"\bem ơi\b", r"\balo\b",
+            r"\bhi joy\b", r"\btroy\b", r"không nói gì", r"sao không nói", r"sao nó không nói", r"im re"
+        ]
+        if any(re.search(p, msg) for p in greeting_patterns):
+            return "greeting", {"raw": user_message}
 
     return None, {}
 
