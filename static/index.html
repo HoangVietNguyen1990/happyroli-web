@@ -2208,8 +2208,41 @@
     let joyTtsEnabled = true;
     let isJoySpeaking = false;
     let isJoyCollapsed = false;
-    let currentJoyAudio = null;
-    let joyAckAudio = null;
+    let cachedBestVoice = null;
+    window.activeJoyUtterances = [];
+    window.activeJoyAckUtterance = null;
+
+    function getBestVietnameseVoice() {
+      if (!window.speechSynthesis) return null;
+      if (cachedBestVoice) return cachedBestVoice;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) return null;
+
+      // 1. Female Vietnamese voice
+      let viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && 
+        (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('linh') || 
+         v.name.toLowerCase().includes('mai') || v.name.toLowerCase().includes('chi') || 
+         v.name.toLowerCase().includes('hoaimy') || v.name.toLowerCase().includes('nu')));
+      
+      // 2. Any Vietnamese voice (avoid male)
+      if (!viVoice) {
+        viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && 
+          !v.name.toLowerCase().includes('male') && !v.name.toLowerCase().includes('nam') && !v.name.toLowerCase().includes('david'));
+      }
+      if (!viVoice) {
+        viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VN'));
+      }
+
+      if (viVoice) cachedBestVoice = viVoice;
+      return viVoice;
+    }
+
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        cachedBestVoice = null;
+        getBestVietnameseVoice();
+      };
+    }
 
     function toggleJoyModal() {
       if (isJoyModalOpen) {
@@ -2224,11 +2257,7 @@
       document.getElementById('joyModal').classList.remove('hidden');
       updateJoyToggleButton();
       loadJoyConfig();
-      if (!joyAckAudio) {
-        joyAckAudio = new Audio('/api/assistant/tts?text=' + encodeURIComponent('Dạ!'));
-        joyAckAudio.preload = 'auto';
-        try { joyAckAudio.load(); } catch(e){}
-      }
+      getBestVietnameseVoice();
       const tip = document.getElementById('joyListeningTip');
       if (tip) tip.textContent = 'Chạm micro 🎙️ để nói chuyện bằng giọng nói, hoặc gõ bên dưới nghen!';
     }
@@ -2237,19 +2266,13 @@
       isJoyModalOpen = false;
       isJoyListening = false;
       isJoySpeaking = false;
-      if (joyRecognition) {
-        try { joyRecognition.abort(); } catch(e){}
-      }
-      if (currentJoyAudio) {
-        try {
-          currentJoyAudio.pause();
-          currentJoyAudio.currentTime = 0;
-          currentJoyAudio.src = "";
-        } catch(e){}
-        currentJoyAudio = null;
-      }
       if (window.speechSynthesis) {
         try { window.speechSynthesis.cancel(); } catch(e){}
+      }
+      window.activeJoyUtterances = [];
+      window.activeJoyAckUtterance = null;
+      if (joyRecognition) {
+        try { joyRecognition.abort(); } catch(e){}
       }
       stopJoyVoice();
       document.getElementById('joyModal').classList.add('hidden');
@@ -2281,6 +2304,12 @@
       const tip = document.getElementById('joyListeningTip');
 
       if (isJoyMuted) {
+        if (window.speechSynthesis) {
+          try { window.speechSynthesis.cancel(); } catch(e){}
+        }
+        isJoySpeaking = false;
+        window.activeJoyUtterances = [];
+        window.activeJoyAckUtterance = null;
         stopJoyVoice();
         if (muteBtn) {
           muteBtn.className = "flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl bg-rose-100 hover:bg-rose-200 border-2 border-rose-400 text-rose-700 shadow-md transition active:scale-95 ring-2 ring-rose-400";
@@ -2347,6 +2376,12 @@
 
     function toggleJoyTts() {
       joyTtsEnabled = !joyTtsEnabled;
+      if (!joyTtsEnabled && window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch(e){}
+        isJoySpeaking = false;
+        window.activeJoyUtterances = [];
+        window.activeJoyAckUtterance = null;
+      }
       document.getElementById('ttsIcon').textContent = joyTtsEnabled ? '🔊' : '🔇';
       document.getElementById('btnJoyTts').classList.toggle('text-amber-300', joyTtsEnabled);
     }
@@ -2385,7 +2420,7 @@
       };
 
       joyRecognition.onresult = (event) => {
-        if (!isJoyModalOpen || !isJoyListening || isJoyMuted) return;
+        if (!isJoyModalOpen || !isJoyListening || isJoyMuted || isJoySpeaking) return;
         let interimText = '';
         let finalText = '';
 
@@ -2529,35 +2564,18 @@
       const tip = document.getElementById('joyListeningTip');
       if (tip) tip.textContent = '👧🏻 Dạ! Joy đang làm nè...';
 
-      let fallbackDone = false;
-      const doFallback = () => {
-        if (fallbackDone) return;
-        fallbackDone = true;
-        if (window.speechSynthesis) {
-          try {
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance('Dạ!');
-            u.lang = 'vi-VN';
-            u.rate = 1.35;
-            u.pitch = 1.35;
-            window.speechSynthesis.speak(u);
-          } catch(e){}
-        }
-      };
-
-      if (!joyAckAudio) {
-        joyAckAudio = new Audio('/api/assistant/tts?text=' + encodeURIComponent('Dạ!'));
-        joyAckAudio.preload = 'auto';
-      }
-
-      try {
-        joyAckAudio.currentTime = 0;
-        const p = joyAckAudio.play();
-        if (p && typeof p.then === 'function') {
-          p.catch(() => doFallback());
-        }
-      } catch(e) {
-        doFallback();
+      if (window.speechSynthesis) {
+        try {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance('Dạ!');
+          u.lang = 'vi-VN';
+          u.rate = 1.3;
+          u.pitch = 1.35;
+          const viVoice = getBestVietnameseVoice();
+          if (viVoice) u.voice = viVoice;
+          window.activeJoyAckUtterance = u;
+          window.speechSynthesis.speak(u);
+        } catch(e){}
       }
     }
 
@@ -2641,14 +2659,7 @@
     }
 
     function speakJoyReply(text) {
-      if (!isJoyModalOpen || !joyTtsEnabled) return;
-      if (joyAckAudio) {
-        try { joyAckAudio.pause(); joyAckAudio.currentTime = 0; } catch(e){}
-      }
-      if (currentJoyAudio) {
-        try { currentJoyAudio.pause(); currentJoyAudio.currentTime = 0; } catch(e){}
-        currentJoyAudio = null;
-      }
+      if (!isJoyModalOpen || !joyTtsEnabled || isJoyMuted) return;
       if (window.speechSynthesis) {
         try { window.speechSynthesis.cancel(); } catch(e){}
       }
@@ -2656,7 +2667,6 @@
       const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
       if (!clean) return;
 
-      // Pause mic recognition while Joy is speaking so she doesn't hear herself
       isJoySpeaking = true;
       if (joyRecognition) {
         try { joyRecognition.abort(); } catch(e){}
@@ -2664,69 +2674,68 @@
       const tip = document.getElementById('joyListeningTip');
       if (tip) tip.textContent = '👧🏻 Em Joy đang nói nè...';
 
-      let finished = false;
+      // Split into natural sentences so mobile browsers never truncate long text
+      const rawSentences = clean.split(/(?<=[.!?])\s+/).filter(s => s && s.trim());
+      const sentences = rawSentences.length > 0 ? rawSentences : [clean];
+      const viVoice = getBestVietnameseVoice();
+
+      let currentIndex = 0;
       let safetyTimer = null;
+      let isEnded = false;
 
-      const resumeListeningAfterTts = () => {
-        if (finished) return;
-        finished = true;
+      const finishSpeech = () => {
+        if (isEnded) return;
+        isEnded = true;
         if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-        isJoySpeaking = false;
-        if (isJoyModalOpen && !isJoyMuted) {
-          const t = document.getElementById('joyListeningTip');
-          if (t) t.textContent = 'Joy đang lắng nghe nè... 🎙️';
-          startJoyListening();
-        } else {
-          stopJoyVoice();
+        window.activeJoyUtterances = [];
+
+        // 500ms silence cushion to avoid microphone picking up phone speaker reverb
+        setTimeout(() => {
+          isJoySpeaking = false;
+          if (isJoyModalOpen && !isJoyMuted) {
+            const t = document.getElementById('joyListeningTip');
+            if (t) t.textContent = 'Joy đang lắng nghe nè... 🎙️';
+            startJoyListening();
+          } else {
+            stopJoyVoice();
+          }
+        }, 500);
+      };
+
+      // Generous safety timer (at least 25 seconds, never cuts off speech prematurely)
+      const maxDurationMs = Math.max(25000, clean.length * 150);
+      safetyTimer = setTimeout(finishSpeech, maxDurationMs);
+
+      window.activeJoyUtterances = [];
+
+      function speakNextChunk() {
+        if (isEnded) return;
+        if (currentIndex >= sentences.length) {
+          finishSpeech();
+          return;
         }
-      };
 
-      // Guaranteed safety timeout: prevents UI from ever getting stuck on "Em Joy đang nói"
-      const maxDurationMs = Math.max(3000, Math.min(10000, clean.length * 75));
-      safetyTimer = setTimeout(resumeListeningAfterTts, maxDurationMs);
+        const chunkText = sentences[currentIndex++];
+        const utter = new SpeechSynthesisUtterance(chunkText);
+        utter.lang = 'vi-VN';
+        utter.rate = 1.25; // Speaks quickly and cheerfully
+        utter.pitch = 1.35; // Youthful bright female pitch
+        if (viVoice) utter.voice = viVoice;
 
-      // 1. High Quality Vietnamese Female Voice via Backend Stream
-      try {
-        const audioUrl = '/api/assistant/tts?text=' + encodeURIComponent(clean);
-        currentJoyAudio = new Audio(audioUrl);
-        currentJoyAudio.playbackRate = 1.25; // Speaks 25% faster: youthful, bright, lively!
-        currentJoyAudio.onended = () => {
-          resumeListeningAfterTts();
+        utter.onend = () => {
+          speakNextChunk();
         };
-        currentJoyAudio.onerror = () => {
-          fallbackBrowserTts(clean, resumeListeningAfterTts);
-        };
-        currentJoyAudio.play().catch(err => {
-          console.warn('Backend TTS autoplay blocked or error, falling back to browser TTS:', err);
-          fallbackBrowserTts(clean, resumeListeningAfterTts);
-        });
-      } catch (err) {
-        fallbackBrowserTts(clean, resumeListeningAfterTts);
-      }
-    }
 
-    function fallbackBrowserTts(clean, onEndCallback) {
-      if (!window.speechSynthesis) {
-        if (onEndCallback) onEndCallback();
-        return;
+        utter.onerror = (err) => {
+          console.warn('[Joy TTS] utterance error:', err);
+          speakNextChunk();
+        };
+
+        window.activeJoyUtterances.push(utter);
+        window.speechSynthesis.speak(utter);
       }
-      const utter = new SpeechSynthesisUtterance(clean);
-      utter.lang = 'vi-VN';
-      utter.rate = 1.25; // Faster rate
-      utter.pitch = 1.35; // Higher pitch = young girl voice!
-      utter.onend = () => {
-        if (onEndCallback) onEndCallback();
-      };
-      utter.onerror = () => {
-        if (onEndCallback) onEndCallback();
-      };
-      const voices = window.speechSynthesis.getVoices();
-      let viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('linh') || v.name.toLowerCase().includes('mai') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('nu')));
-      if (!viVoice) {
-        viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && !v.name.toLowerCase().includes('david') && !v.name.toLowerCase().includes('male') && !v.name.toLowerCase().includes('nam'));
-      }
-      if (viVoice) utter.voice = viVoice;
-      window.speechSynthesis.speak(utter);
+
+      speakNextChunk();
     }
 
     async function kioskClock(action) {
