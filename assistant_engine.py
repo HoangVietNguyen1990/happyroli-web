@@ -64,11 +64,18 @@ DAYS_VI_NAMES = {
 
 # Phonetic & speech recognition dictionary for Brumby's Pakenham staff
 PHONETIC_ALIASES = {
-    "Jane": ["jane", "trên", "chen", "zen", "dzen", "jen", "den", "gen", "chên", "trang", "chiên", "dane", "dzên"],
-    "Robert": ["robert", "rô bốt", "ro bốt", "rô bớt", "ro bớt", "rô béc", "rô-bớt"],
-    "Elizabeth": ["elizabeth", "ê li za bét", "ê li za bet", "ê li", "ê-li", "li za", "lisa", "ly za", "bét", "bết", "li sa", "lisa pham", "lisa phạm"],
+    "Jane": [
+        "jane", "chan", "chane", "trên", "chen", "zen", "dzen", "jen", "den", "gen",
+        "chên", "trang", "tran", "chiên", "dane", "dzên", "gian", "giang", "san", "shane",
+        "cheyn", "jain", "zane", "sen"
+    ],
+    "Robert": ["robert", "rô bốt", "ro bốt", "rô bớt", "ro bớt", "rô béc", "rô-bớt", "ro béc", "rô-bét"],
+    "Elizabeth": [
+        "elizabeth", "ê li za bét", "ê li za bet", "ê li", "ê-li", "li za", "lisa", "ly za",
+        "bét", "bết", "li sa", "lisa pham", "lisa phạm", "e li", "e-li", "li-za"
+    ],
     "Anastasia": ["anastasia", "a na", "a-na", "a na sờ ta sia", "na sờ ta sia", "a na sta sia", "ana"],
-    "Milina": ["milina", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na"],
+    "Milina": ["milina", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina"],
     "Violet": ["violet", "vai ô lét", "vi ô lét", "vai let", "vi let", "vai-o-let"],
     "Aimi": ["aimi", "ai mi", "ai my", "ay mi"],
     "Ainsley Mactier": ["ainsley", "mactier", "en xli", "en xly", "mắc ti er", "mác ti ơ", "en-xli", "mắc ti e", "ainsley mactier"],
@@ -310,6 +317,15 @@ def parse_intent_rule_based(user_message: str, roster_rows: List[Dict[str, Any]]
 
     day = normalize_day(msg)
     found_emps = find_employees_in_text(msg, all_emp)
+
+    # If only 1 employee found, check if there is another employee after 'sang cho', 'qua cho', 'cho'
+    if len(found_emps) == 1:
+        m_to = re.search(r"(?:sang\s+cho|qua\s+cho|cho)\s+([a-zA-Zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+)", msg)
+        if m_to:
+            cand = m_to.group(1).strip()
+            matched_target = match_employee_name(cand, all_emp)
+            if matched_target and matched_target.lower() != found_emps[0].lower():
+                found_emps.append(matched_target)
 
     # 1. Two employees mentioned: swap or reassign
     if len(found_emps) >= 2:

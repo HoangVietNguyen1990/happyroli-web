@@ -2229,12 +2229,23 @@
 
     function closeJoyModal() {
       isJoyModalOpen = false;
-      stopJoyVoice();
+      isJoyListening = false;
+      isJoySpeaking = false;
+      if (joyRecognition) {
+        try { joyRecognition.abort(); } catch(e){}
+      }
       if (currentJoyAudio) {
-        try { currentJoyAudio.pause(); } catch(e){}
+        try {
+          currentJoyAudio.pause();
+          currentJoyAudio.currentTime = 0;
+          currentJoyAudio.src = "";
+        } catch(e){}
         currentJoyAudio = null;
       }
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch(e){}
+      }
+      stopJoyVoice();
       document.getElementById('joyModal').classList.add('hidden');
       updateJoyToggleButton();
     }
@@ -2354,6 +2365,7 @@
       };
 
       joyRecognition.onresult = (event) => {
+        if (!isJoyModalOpen || !isJoyListening || isJoyMuted) return;
         let interimText = '';
         let finalText = '';
 
@@ -2382,7 +2394,7 @@
 
       joyRecognition.onerror = (e) => {
         console.warn('Speech error:', e);
-        if (e.error === 'no-speech') {
+        if (e.error === 'no-speech' || e.error === 'aborted') {
           return;
         }
         if (e.error === 'not-allowed') {
@@ -2393,29 +2405,33 @@
       };
 
       joyRecognition.onend = () => {
-        if (isJoyListening && !isJoyMuted && !isJoySpeaking && isJoyModalOpen) {
+        if (!isJoyModalOpen || isJoyMuted || !isJoyListening) {
+          stopJoyVoice();
+          return;
+        }
+        if (!isJoySpeaking) {
           try {
             joyRecognition.start();
           } catch(err) {
             stopJoyVoice();
           }
-        } else if (!isJoySpeaking) {
-          stopJoyVoice();
         }
       };
     }
 
     function startJoyListening() {
-      if (isJoyMuted) return;
+      if (!isJoyModalOpen || isJoyMuted) return;
       if (!joyRecognition) initJoyVoice();
       if (!joyRecognition) return;
       isJoyListening = true;
       try {
         joyRecognition.start();
       } catch (err) {
-        try { joyRecognition.stop(); } catch(e){}
+        try { joyRecognition.abort(); } catch(e){}
         setTimeout(() => {
-          try { joyRecognition.start(); } catch(e){}
+          if (isJoyListening && isJoyModalOpen && !isJoyMuted && !isJoySpeaking) {
+            try { joyRecognition.start(); } catch(e){}
+          }
         }, 200);
       }
     }
@@ -2425,12 +2441,8 @@
         toggleJoyMute();
         return;
       }
-      if (!joyRecognition) initJoyVoice();
-      if (!joyRecognition) return;
-
       if (isJoyListening) {
         isJoyListening = false;
-        try { joyRecognition.stop(); } catch(e){}
         stopJoyVoice();
       } else {
         startJoyListening();
@@ -2439,6 +2451,9 @@
 
     function stopJoyVoice() {
       isJoyListening = false;
+      if (joyRecognition) {
+        try { joyRecognition.abort(); } catch(e){}
+      }
       const wave = document.getElementById('joyMicWave');
       const btn = document.getElementById('joyMicBtn');
       const liveBox = document.getElementById('joyLiveTranscript');
@@ -2559,41 +2574,52 @@
     }
 
     function speakJoyReply(text) {
-      if (!joyTtsEnabled) return;
+      if (!isJoyModalOpen || !joyTtsEnabled) return;
       if (currentJoyAudio) {
-        try { currentJoyAudio.pause(); } catch(e){}
+        try { currentJoyAudio.pause(); currentJoyAudio.currentTime = 0; } catch(e){}
         currentJoyAudio = null;
       }
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (window.speechSynthesis) {
+        try { window.speechSynthesis.cancel(); } catch(e){}
+      }
 
       const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
       if (!clean) return;
 
       // Pause mic recognition while Joy is speaking so she doesn't hear herself
       isJoySpeaking = true;
-      if (joyRecognition && isJoyListening) {
-        try { joyRecognition.stop(); } catch(e){}
+      if (joyRecognition) {
+        try { joyRecognition.abort(); } catch(e){}
       }
       const tip = document.getElementById('joyListeningTip');
       if (tip) tip.textContent = '👧🏻 Em Joy đang nói nè...';
 
+      let finished = false;
+      let safetyTimer = null;
+
       const resumeListeningAfterTts = () => {
+        if (finished) return;
+        finished = true;
+        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
         isJoySpeaking = false;
         if (isJoyModalOpen && !isJoyMuted) {
           const t = document.getElementById('joyListeningTip');
           if (t) t.textContent = '🎙️ Joy đã nói xong, đang lắng nghe chị Nhi dặn tiếp nè!';
-          isJoyListening = true;
-          try {
-            if (!joyRecognition) initJoyVoice();
-            joyRecognition.start();
-          } catch(e){}
+          startJoyListening();
+        } else {
+          stopJoyVoice();
         }
       };
+
+      // Guaranteed safety timeout: prevents UI from ever getting stuck on "Em Joy đang nói"
+      const maxDurationMs = Math.max(3000, Math.min(10000, clean.length * 75));
+      safetyTimer = setTimeout(resumeListeningAfterTts, maxDurationMs);
 
       // 1. High Quality Vietnamese Female Voice via Backend Stream
       try {
         const audioUrl = '/api/assistant/tts?text=' + encodeURIComponent(clean);
         currentJoyAudio = new Audio(audioUrl);
+        currentJoyAudio.playbackRate = 1.25; // Speaks 25% faster: youthful, bright, lively!
         currentJoyAudio.onended = () => {
           resumeListeningAfterTts();
         };
@@ -2616,8 +2642,8 @@
       }
       const utter = new SpeechSynthesisUtterance(clean);
       utter.lang = 'vi-VN';
-      utter.rate = 1.05;
-      utter.pitch = 1.25;
+      utter.rate = 1.25; // Faster rate
+      utter.pitch = 1.35; // Higher pitch = young girl voice!
       utter.onend = () => {
         if (onEndCallback) onEndCallback();
       };
@@ -2625,7 +2651,10 @@
         if (onEndCallback) onEndCallback();
       };
       const voices = window.speechSynthesis.getVoices();
-      const viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && !v.name.toLowerCase().includes('david') && !v.name.toLowerCase().includes('male'));
+      let viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('linh') || v.name.toLowerCase().includes('mai') || v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('nu')));
+      if (!viVoice) {
+        viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && !v.name.toLowerCase().includes('david') && !v.name.toLowerCase().includes('male') && !v.name.toLowerCase().includes('nam'));
+      }
       if (viVoice) utter.voice = viVoice;
       window.speechSynthesis.speak(utter);
     }
