@@ -53,6 +53,35 @@ class HappyRollyDB:
                     payload_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS assistant_conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    speaker TEXT NOT NULL,
+                    message_text TEXT NOT NULL,
+                    action_taken_json TEXT,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS manager_learned_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    rule_type TEXT NOT NULL,
+                    employee TEXT NOT NULL,
+                    day TEXT,
+                    shift_name TEXT,
+                    preference TEXT NOT NULL,
+                    weight_score INTEGER NOT NULL DEFAULT 50,
+                    notes TEXT,
+                    created_at TEXT NOT NULL,
+                    active INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE TABLE IF NOT EXISTS manager_profile_memory (
+                    fact_key TEXT PRIMARY KEY,
+                    category TEXT NOT NULL,
+                    fact_summary TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -211,3 +240,83 @@ class HappyRollyDB:
                 "roster_drafts_count": drafts,
                 "system_docs": [r["doc_key"] for r in sys_docs],
             }
+
+    # --- AI Assistant Conversations & Memory ---
+    def save_chat_message(self, session_id: str, speaker: str, message_text: str, action_taken: Any = None) -> bool:
+        now_iso = datetime.now().isoformat()
+        act_json = json.dumps(action_taken, ensure_ascii=False) if action_taken else None
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO assistant_conversations (session_id, speaker, message_text, action_taken_json, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (session_id or "default", speaker, message_text, act_json, now_iso),
+            )
+        return True
+
+    def get_recent_chat_history(self, session_id: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
+        with self._connect() as conn:
+            if session_id:
+                rows = conn.execute(
+                    "SELECT id, session_id, speaker, message_text, action_taken_json, created_at FROM assistant_conversations WHERE session_id = ? ORDER BY id DESC LIMIT ?",
+                    (session_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT id, session_id, speaker, message_text, action_taken_json, created_at FROM assistant_conversations ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            res = [dict(r) for r in rows]
+            res.reverse()
+            return res
+
+    def save_learned_rule(
+        self,
+        rule_type: str,
+        employee: str,
+        day: Optional[str] = "",
+        shift_name: Optional[str] = "",
+        preference: str = "PREFER",
+        weight_score: int = 50,
+        notes: str = "",
+    ) -> bool:
+        now_iso = datetime.now().isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO manager_learned_rules (rule_type, employee, day, shift_name, preference, weight_score, notes, created_at, active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                """,
+                (rule_type, employee, day or "", shift_name or "", preference, weight_score, notes, now_iso),
+            )
+        return True
+
+    def get_learned_rules(self, active_only: bool = True) -> List[Dict[str, Any]]:
+        with self._connect() as conn:
+            if active_only:
+                rows = conn.execute("SELECT * FROM manager_learned_rules WHERE active = 1 ORDER BY id DESC").fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM manager_learned_rules ORDER BY id DESC").fetchall()
+            return [dict(r) for r in rows]
+
+    def save_memory_fact(self, fact_key: str, category: str, fact_summary: str) -> bool:
+        now_iso = datetime.now().isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO manager_profile_memory (fact_key, category, fact_summary, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(fact_key) DO UPDATE SET
+                    category = excluded.category,
+                    fact_summary = excluded.fact_summary,
+                    updated_at = excluded.updated_at
+                """,
+                (fact_key, category, fact_summary, now_iso),
+            )
+        return True
+
+    def get_memory_facts(self) -> List[Dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM manager_profile_memory ORDER BY updated_at DESC").fetchall()
+            return [dict(r) for r in rows]

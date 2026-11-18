@@ -464,6 +464,7 @@ def solve_roster_records(
     requirements: List[Dict[str, Any]],
     fixed: List[Dict[str, Any]],
     start_date_str: str,
+    learned_rules: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Pure-Python Roster Solver adhering strictly to General Retail Award MA000004 & Bakery rules."""
     start_dt = parse_date_robust(start_date_str) or date.today()
@@ -625,6 +626,19 @@ def solve_roster_records(
                     score += (21 - age) * shift_info["duration"] * 2.0
                 if name == "Elizabeth" and shift_info["start"] in (7.0, 7.5):
                     score += 100.0
+
+                if learned_rules:
+                    for rule in learned_rules:
+                        r_emp = str(rule.get("employee") or "").strip().lower()
+                        if r_emp in ("all", norm_name):
+                            r_day = str(rule.get("day") or "").strip().lower()
+                            if not r_day or r_day.startswith(day[:3].lower()) or r_day == day.lower():
+                                pref = str(rule.get("preference") or "PREFER").upper()
+                                weight = float(rule.get("weight_score") or 50.0)
+                                if pref in ("AVOID", "NEVER"):
+                                    score -= abs(weight)
+                                else:
+                                    score += abs(weight)
 
                 if score > best_score:
                     best_score = score

@@ -37,6 +37,7 @@ from core_engine import (
     solve_roster_records,
     sort_records_by_team_and_age,
 )
+from assistant_engine import process_assistant_chat
 
 db = HappyRollyDB()
 STATIC_DIR = os.path.join(HAPPYROLLY_DIR, "static")
@@ -680,12 +681,90 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "doc_key": doc_key, "data": payload})
             return
 
+        if path == "/api/assistant/history":
+            session_id = qs.get("session_id", ["default"])[0]
+            history = db.get_recent_chat_history(session_id, limit=20)
+            rules = db.get_learned_rules(active_only=True)
+            facts = db.get_memory_facts()
+            self._send_json(200, {"ok": True, "history": history, "learned_rules": rules, "memory_facts": facts})
+            return
+
+        if path == "/api/assistant/config":
+            cfg = db.load_system_doc("ai_assistant_config") or {}
+            key = cfg.get("gemini_api_key", "")
+            masked = ("•" * 8 + key[-4:]) if len(key) >= 8 else ("•" * len(key))
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "config": {
+                        "has_key": bool(key),
+                        "masked_key": masked,
+                        "model_name": cfg.get("model_name", "gemini-2.5-flash"),
+                        "persona": "Joy",
+                        "accent": "Phan Rang",
+                    },
+                },
+            )
+            return
+
+        if path == "/api/assistant/rules":
+            rules = db.get_learned_rules(active_only=True)
+            self._send_json(200, {"ok": True, "rules": rules})
+            return
+
         self._send_json(404, {"ok": False, "error": "Not found"})
 
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
         body = self._read_json_body()
+
+        if path == "/api/assistant/config":
+            curr = db.load_system_doc("ai_assistant_config") or {}
+            new_key = str(body.get("gemini_api_key", "")).strip()
+            if new_key:
+                curr["gemini_api_key"] = new_key
+            if "model_name" in body:
+                curr["model_name"] = str(body["model_name"]).strip()
+            db.save_system_doc("ai_assistant_config", curr)
+            self._send_json(200, {"ok": True, "message": "Joy AI configuration saved successfully!"})
+            return
+
+        if path == "/api/assistant/chat":
+            msg = str(body.get("message", "")).strip()
+            session_id = str(body.get("session_id", "default")).strip()
+            date_str = str(body.get("date_str", "")).strip()
+            roster_rows = body.get("roster_rows")
+
+            if not roster_rows:
+                if date_str:
+                    draft_tuple = db.load_roster_draft(date_str)
+                    roster_rows = draft_tuple[0] if draft_tuple else (db.load_finalized_roster(date_str) or [])
+                if not roster_rows:
+                    recent_drafts = db.list_roster_drafts()
+                    if recent_drafts:
+                        d_id = recent_drafts[0]["draft_id"]
+                        d_tuple = db.load_roster_draft(recent_drafts[0]["date_str"], recent_drafts[0]["owner_key"])
+                        roster_rows = d_tuple[0] if d_tuple else []
+
+            ai_cfg = db.load_system_doc("ai_assistant_config") or {}
+            api_key = ai_cfg.get("gemini_api_key", "")
+
+            result = process_assistant_chat(
+                user_message=msg,
+                roster_rows=roster_rows or [],
+                db=db,
+                session_id=session_id,
+                api_key=api_key,
+            )
+
+            # Auto-save updated roster draft if actions were taken
+            if result.get("actions_executed") and date_str and result.get("updated_roster"):
+                db.save_roster_draft(date_str, result["updated_roster"], owner_key="manager")
+
+            self._send_json(200, result)
+            return
 
         if path == "/api/login":
             username = str(body.get("username", "")).strip().lower()
@@ -944,7 +1023,8 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
             requirements = body.get("requirements") or db.load_records("requirements") or []
             fixed = body.get("fixed") or db.load_records("fixed") or []
 
-            solved_rows = solve_roster_records(employees, unavailability, requirements, fixed, start_date)
+            learned_rules = db.get_learned_rules(active_only=True)
+            solved_rows = solve_roster_records(employees, unavailability, requirements, fixed, start_date, learned_rules=learned_rules)
             db.save_roster_draft(start_date, solved_rows, owner_key="manager")
             profiles = db.load_system_doc("user_profiles") or {}
             wages = calculate_wages_records(solved_rows, employees, profiles)

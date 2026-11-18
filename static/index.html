@@ -425,6 +425,33 @@
         </div>
       </div>
 
+      <!-- JOY AI VOICE CO-PILOT BANNER & TRIGGER -->
+      <div id="joyVoiceBar" class="bg-gradient-to-r from-amber-500 via-rose-500 to-emerald-600 p-0.5 rounded-2xl shadow-md">
+        <div class="bg-white p-3 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-rose-400 flex items-center justify-center text-xl shadow-sm">
+              👧🏻
+            </div>
+            <div>
+              <div class="font-black text-sm text-gray-900 flex items-center gap-1.5">
+                <span>Trợ lý Em Joy</span>
+                <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">Phan Rang 🥖</span>
+              </div>
+              <div class="text-[11px] text-gray-500 font-semibold">Chị Nhi chạm nút bên cạnh để nói chuyện hoặc dặn dò Joy sửa lịch trực tiếp nghen!</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="openJoyModal()" class="bg-gradient-to-r from-forest to-emerald-600 hover:brightness-110 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2">
+              <span class="text-base">🎙️</span>
+              <span>Nói chuyện với Joy</span>
+            </button>
+            <button onclick="openJoySettings()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs p-2.5 rounded-xl" title="Cấu hình Gemini API Key">
+              ⚙️
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- BLOCK 2: Dedicated Zoom & Mobile Fit Toolbar (Below Date Selection, Directly Above Generated Table) -->
       <div class="bg-white p-3.5 rounded-xl shadow-sm border border-gray-200 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div class="flex flex-wrap items-center gap-3">
@@ -791,6 +818,107 @@
         <div id="kioskStatus" class="text-xs font-bold text-spruce pt-2"></div>
       </div>
     </section>
+
+    <!-- ==================== JOY AI VOICE ASSISTANT MODAL ==================== -->
+    <div id="joyModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition">
+      <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-spruce via-forest to-emerald-800 text-white p-4 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-full bg-gradient-to-tr from-amber-300 to-rose-300 flex items-center justify-center text-2xl shadow-inner border-2 border-white/40">
+              👧🏻
+            </div>
+            <div>
+              <div class="font-black text-sm flex items-center gap-2">
+                <span>Em Joy</span>
+                <span class="bg-amber-400 text-charcoal text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Phan Rang 🥖</span>
+              </div>
+              <div class="text-[11px] text-emerald-200">Trợ lý Lịch Roster của Chị Nhi</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="toggleJoyTts()" id="btnJoyTts" class="text-xs bg-black/20 hover:bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/20 flex items-center gap-1 font-bold">
+              <span id="ttsIcon">🔊</span> Bật tiếng
+            </button>
+            <button onclick="closeJoyModal()" class="text-white hover:bg-white/20 w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg">✕</button>
+          </div>
+        </div>
+
+        <!-- Chat Log Area -->
+        <div id="joyChatLog" class="p-4 overflow-y-auto flex-1 space-y-3 bg-gray-50 text-xs min-h-[220px] max-h-[360px]">
+          <div class="flex items-start gap-2.5">
+            <div class="w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center text-sm flex-shrink-0">👧🏻</div>
+            <div class="bg-white p-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-200 max-w-[85%] space-y-1">
+              <div class="font-extrabold text-forest">Em Joy</div>
+              <div class="text-gray-800">Dạ Joy chào chị Nhi! Joy đang sẵn sàng rồi nè. Chị Nhi muốn đổi ca của bạn nào, thứ mấy với mấy giờ thì nói hoặc dặn Joy làm liền nghen! 🥖✨</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action / Status Alert Bar -->
+        <div id="joyActionStatus" class="hidden px-4 py-2 bg-emerald-50 border-t border-emerald-100 text-[11px] font-bold text-emerald-800 flex items-center justify-between">
+          <span id="joyActionText">✅ Đã cập nhật Roster</span>
+          <span class="text-emerald-500">Live Updated</span>
+        </div>
+
+        <!-- Voice & Text Input Toolbar -->
+        <div class="p-3 bg-white border-t border-gray-200 space-y-2">
+          <!-- Big Interactive Microphone Button -->
+          <div class="flex items-center justify-center py-1">
+            <button id="joyMicBtn" onclick="toggleJoyVoice()" class="relative group flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-600 to-forest text-white shadow-lg hover:scale-105 active:scale-95 transition">
+              <span id="joyMicWave" class="hidden absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
+              <span id="joyMicIcon" class="text-2xl relative z-10">🎙️</span>
+            </button>
+          </div>
+          <div id="joyListeningTip" class="text-center text-[11px] text-gray-500 font-semibold">
+            Chạm micro để nói chuyện bằng giọng nói, hoặc gõ bên dưới nè:
+          </div>
+
+          <!-- Text Input Form -->
+          <form onsubmit="handleJoySend(event)" class="flex gap-2">
+            <input type="text" id="joyTextInput" placeholder="ví dụ: Đổi ca thứ 4 của Shaelyn qua cho Milina..." class="flex-1 border border-gray-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-forest" />
+            <button type="submit" class="bg-forest hover:bg-spruce text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">Gửi</button>
+          </form>
+        </div>
+
+        <!-- Quick Suggestions Chips -->
+        <div class="px-4 py-2.5 bg-gray-100 text-[11px] flex flex-wrap gap-1.5 border-t border-gray-200">
+          <span class="text-gray-400 font-bold self-center">Gợi ý:</span>
+          <button onclick="quickJoyAsk('Đổi ca thứ 4 của Shaelyn qua cho Milina')" class="bg-white hover:bg-gray-200 px-2.5 py-1 rounded-full border border-gray-200 text-gray-700">🔄 Đổi ca thứ 4</button>
+          <button onclick="quickJoyAsk('Thứ 7 cho Jack nghỉ nghen')" class="bg-white hover:bg-gray-200 px-2.5 py-1 rounded-full border border-gray-200 text-gray-700">🏖️ Thứ 7 cho Jack nghỉ</button>
+          <button onclick="quickJoyAsk('Nhớ từ nay về sau thứ 7 đừng xếp Jack ca mở cửa nghen')" class="bg-white hover:bg-gray-200 px-2.5 py-1 rounded-full border border-gray-200 text-amber-800">🧠 Dặn Joy nhớ luật</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- JOY SETTINGS MODAL -->
+    <div id="joySettingsModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden p-5 space-y-4 text-xs">
+        <div class="flex items-center justify-between border-b pb-3">
+          <h3 class="font-extrabold text-sm text-spruce">⚙️ Cấu hình Trí tuệ Em Joy (Gemini API)</h3>
+          <button onclick="closeJoySettings()" class="text-gray-400 hover:text-gray-600 font-bold text-base">✕</button>
+        </div>
+        <p class="text-gray-600">
+          Joy luôn có sẵn <b>Engine nhận diện quy tắc thông minh</b> không cần API key. Nếu bạn muốn Joy trò chuyện nâng cao, bạn có thể dán <b>Google Gemini API Key</b> miễn phí vào đây:
+        </p>
+        <div>
+          <label class="font-bold block mb-1">Google Gemini API Key:</label>
+          <input type="password" id="joyApiKeyInput" placeholder="AIzaSy..." class="w-full border rounded-lg px-3 py-2 font-mono text-xs" />
+          <span id="joyApiKeyStatus" class="text-[11px] text-gray-400 mt-1 block"></span>
+        </div>
+        <div>
+          <label class="font-bold block mb-1">Model AI:</label>
+          <select id="joyModelSelect" class="w-full border rounded-lg px-3 py-2 font-bold text-spruce">
+            <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Nhanh &amp; Khuyên dùng)</option>
+            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (Siêu nhẹ)</option>
+          </select>
+        </div>
+        <div class="flex justify-between items-center pt-2">
+          <a href="https://aistudio.google.com/apikey" target="_blank" class="text-emerald-700 underline font-bold">Lấy Key miễn phí tại đây ↗</a>
+          <button onclick="saveJoySettings()" class="bg-forest hover:bg-spruce text-white font-extrabold px-5 py-2 rounded-xl shadow">Lưu Cấu Hình</button>
+        </div>
+      </div>
+    </div>
 
   </main>
 
@@ -2058,6 +2186,234 @@
 
       alert(`✅ Unavailability submitted for ${added} day(s)! Shop owners have been notified via email.`);
       refreshStaffPortal();
+    }
+
+    // ==================== JOY AI VOICE ASSISTANT (PHAN RANG CO-PILOT) ====================
+    let joyRecognition = null;
+    let isJoyListening = false;
+    let joyTtsEnabled = true;
+
+    function openJoyModal() {
+      document.getElementById('joyModal').classList.remove('hidden');
+      loadJoyConfig();
+    }
+
+    function closeJoyModal() {
+      stopJoyVoice();
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      document.getElementById('joyModal').classList.add('hidden');
+    }
+
+    function openJoySettings() {
+      document.getElementById('joySettingsModal').classList.remove('hidden');
+      loadJoyConfig();
+    }
+
+    function closeJoySettings() {
+      document.getElementById('joySettingsModal').classList.add('hidden');
+    }
+
+    async function loadJoyConfig() {
+      try {
+        const res = await fetch('/api/assistant/config');
+        const data = await res.json();
+        if (data.ok && data.config) {
+          const statusEl = document.getElementById('joyApiKeyStatus');
+          if (statusEl) {
+            statusEl.textContent = data.config.has_key ? `Đã lưu key: ${data.config.masked_key} (Đang hoạt động)` : 'Chưa cấu hình (Đang dùng Engine thông minh cục bộ)';
+          }
+          if (document.getElementById('joyModelSelect') && data.config.model_name) {
+            document.getElementById('joyModelSelect').value = data.config.model_name;
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function saveJoySettings() {
+      const apiKey = document.getElementById('joyApiKeyInput').value.trim();
+      const model = document.getElementById('joyModelSelect').value;
+      try {
+        const res = await fetch('/api/assistant/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gemini_api_key: apiKey, model_name: model })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert('✅ Đã lưu cấu hình Google Gemini thành công cho em Joy!');
+          document.getElementById('joyApiKeyInput').value = '';
+          closeJoySettings();
+          loadJoyConfig();
+        }
+      } catch (e) {
+        alert('Lỗi lưu cấu hình: ' + e.message);
+      }
+    }
+
+    function toggleJoyTts() {
+      joyTtsEnabled = !joyTtsEnabled;
+      document.getElementById('ttsIcon').textContent = joyTtsEnabled ? '🔊' : '🔇';
+      document.getElementById('btnJoyTts').classList.toggle('text-amber-300', joyTtsEnabled);
+    }
+
+    function initJoyVoice() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        document.getElementById('joyListeningTip').textContent = 'Trình duyệt này chưa hỗ trợ Web Speech, chị Nhi gõ chữ gửi cho Joy nghen!';
+        return;
+      }
+      joyRecognition = new SpeechRec();
+      joyRecognition.continuous = false;
+      joyRecognition.interimResults = false;
+      joyRecognition.lang = 'vi-VN';
+
+      joyRecognition.onstart = () => {
+        isJoyListening = true;
+        document.getElementById('joyMicWave').classList.remove('hidden');
+        document.getElementById('joyMicBtn').classList.add('ring-4', 'ring-rose-400');
+        document.getElementById('joyListeningTip').textContent = '🎙️ Joy đang lắng nghe chị Nhi nói nè...';
+      };
+
+      joyRecognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('joyTextInput').value = transcript;
+        sendJoyMessage(transcript);
+      };
+
+      joyRecognition.onerror = (e) => {
+        console.warn('Speech error:', e);
+        stopJoyVoice();
+        document.getElementById('joyListeningTip').textContent = 'Joy nghe chưa kịp á, chị chạm micro nói lại hoặc gõ nghen!';
+      };
+
+      joyRecognition.onend = () => {
+        stopJoyVoice();
+      };
+    }
+
+    function toggleJoyVoice() {
+      if (!joyRecognition) initJoyVoice();
+      if (!joyRecognition) return;
+      if (isJoyListening) {
+        joyRecognition.stop();
+        stopJoyVoice();
+      } else {
+        try {
+          joyRecognition.start();
+        } catch (err) {
+          joyRecognition.stop();
+          setTimeout(() => joyRecognition.start(), 200);
+        }
+      }
+    }
+
+    function stopJoyVoice() {
+      isJoyListening = false;
+      const wave = document.getElementById('joyMicWave');
+      const btn = document.getElementById('joyMicBtn');
+      if (wave) wave.classList.add('hidden');
+      if (btn) btn.classList.remove('ring-4', 'ring-rose-400');
+      const tip = document.getElementById('joyListeningTip');
+      if (tip) tip.textContent = 'Chạm micro để nói chuyện, hoặc gõ bên dưới nè:';
+    }
+
+    function handleJoySend(e) {
+      e.preventDefault();
+      const input = document.getElementById('joyTextInput');
+      const text = input.value.trim();
+      if (text) sendJoyMessage(text);
+    }
+
+    function quickJoyAsk(text) {
+      sendJoyMessage(text);
+    }
+
+    function appendJoyChat(speaker, message) {
+      const chatLog = document.getElementById('joyChatLog');
+      const isJoy = speaker.toLowerCase() === 'joy';
+      const bubble = document.createElement('div');
+      bubble.className = `flex items-start gap-2.5 ${isJoy ? '' : 'flex-row-reverse'}`;
+      bubble.innerHTML = `
+        <div class="w-7 h-7 rounded-full ${isJoy ? 'bg-amber-400' : 'bg-spruce text-white'} flex items-center justify-center text-sm flex-shrink-0">
+          ${isJoy ? '👧🏻' : '👩🏻'}
+        </div>
+        <div class="p-3 rounded-2xl ${isJoy ? 'rounded-tl-sm bg-white shadow-sm border border-gray-200 text-gray-800' : 'rounded-tr-sm bg-forest text-white'} max-w-[85%] space-y-1">
+          <div class="font-extrabold text-[10px] ${isJoy ? 'text-forest' : 'text-amber-200'}">${isJoy ? 'Em Joy' : 'Chị Nhi'}</div>
+          <div class="leading-relaxed">${message}</div>
+        </div>
+      `;
+      chatLog.appendChild(bubble);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    async function sendJoyMessage(text) {
+      if (!text || !text.trim()) return;
+      appendJoyChat('manager', text);
+      document.getElementById('joyTextInput').value = '';
+
+      const typingId = 'joy_typing_' + Date.now();
+      const chatLog = document.getElementById('joyChatLog');
+      const typingEl = document.createElement('div');
+      typingEl.id = typingId;
+      typingEl.className = 'flex items-start gap-2.5';
+      typingEl.innerHTML = `
+        <div class="w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center text-sm">👧🏻</div>
+        <div class="bg-white p-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-200 text-gray-400 italic">
+          Joy đang làm nè chị Nhi...
+        </div>
+      `;
+      chatLog.appendChild(typingEl);
+      chatLog.scrollTop = chatLog.scrollHeight;
+
+      try {
+        const curRows = (generatedRows && generatedRows.length) ? generatedRows : currentRosterRows;
+        const curDate = (document.getElementById('genStartDate') ? document.getElementById('genStartDate').value : currentRosterDate);
+
+        const res = await fetch('/api/assistant/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            date_str: curDate,
+            roster_rows: curRows
+          })
+        });
+        const data = await res.json();
+        document.getElementById(typingId)?.remove();
+
+        if (data.ok) {
+          appendJoyChat('Joy', data.reply);
+          if (joyTtsEnabled) speakJoyReply(data.reply);
+
+          if (data.actions_executed && data.actions_executed.length && data.updated_roster) {
+            generatedRows = data.updated_roster;
+            renderGeneratedRosterEditor();
+            const act = data.actions_executed[0];
+            document.getElementById('joyActionText').textContent = `✅ Đã sửa Roster trực tiếp (${act.action || 'Thành công'})`;
+            document.getElementById('joyActionStatus').classList.remove('hidden');
+            setTimeout(() => document.getElementById('joyActionStatus')?.classList.add('hidden'), 6000);
+          }
+        } else {
+          appendJoyChat('Joy', 'Chị Nhi ơi, Joy chưa rõ lắm, chị dặn lại Joy nghen!');
+        }
+      } catch (e) {
+        document.getElementById(typingId)?.remove();
+        appendJoyChat('Joy', 'Ủa chị Nhi ơi, mạng lag tí xíu rồi nè, chị thử lại nghen!');
+      }
+    }
+
+    function speakJoyReply(text) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+      const utter = new SpeechSynthesisUtterance(clean);
+      utter.lang = 'vi-VN';
+      utter.rate = 1.05;
+      utter.pitch = 1.15;
+      const voices = window.speechSynthesis.getVoices();
+      const viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VN'));
+      if (viVoice) utter.voice = viVoice;
+      window.speechSynthesis.speak(utter);
     }
 
     async function kioskClock(action) {
