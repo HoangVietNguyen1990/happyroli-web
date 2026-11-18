@@ -9,36 +9,44 @@ from typing import Any, Dict, List, Optional, Tuple
 DAYS_MAP = {
     "thứ 2": "Monday",
     "thứ hai": "Monday",
+    "ngày thứ hai": "Monday",
     "t2": "Monday",
     "mon": "Monday",
     "monday": "Monday",
     "thứ 3": "Tuesday",
     "thứ ba": "Tuesday",
+    "ngày thứ ba": "Tuesday",
     "t3": "Tuesday",
     "tue": "Tuesday",
     "tuesday": "Tuesday",
     "thứ 4": "Wednesday",
     "thứ tư": "Wednesday",
+    "thứ bốn": "Wednesday",
+    "ngày thứ tư": "Wednesday",
     "t4": "Wednesday",
     "wed": "Wednesday",
     "wednesday": "Wednesday",
     "thứ 5": "Thursday",
     "thứ năm": "Thursday",
+    "ngày thứ năm": "Thursday",
     "t5": "Thursday",
     "thu": "Thursday",
     "thursday": "Thursday",
     "thứ 6": "Friday",
     "thứ sáu": "Friday",
+    "ngày thứ sáu": "Friday",
     "t6": "Friday",
     "fri": "Friday",
     "friday": "Friday",
     "thứ 7": "Saturday",
     "thứ bảy": "Saturday",
+    "ngày thứ bảy": "Saturday",
     "t7": "Saturday",
     "sat": "Saturday",
     "saturday": "Saturday",
     "chủ nhật": "Sunday",
     "chu nhat": "Sunday",
+    "ngày chủ nhật": "Sunday",
     "cn": "Sunday",
     "sun": "Sunday",
     "sunday": "Sunday",
@@ -54,6 +62,26 @@ DAYS_VI_NAMES = {
     "Sunday": "Chủ Nhật",
 }
 
+# Phonetic & speech recognition dictionary for Brumby's Pakenham staff
+PHONETIC_ALIASES = {
+    "Jane": ["jane", "trên", "chen", "zen", "dzen", "jen", "den", "gen", "chên", "trang", "chiên", "dane", "dzên"],
+    "Robert": ["robert", "rô bốt", "ro bốt", "rô bớt", "ro bớt", "rô béc", "rô-bớt"],
+    "Elizabeth": ["elizabeth", "ê li za bét", "ê li za bet", "ê li", "ê-li", "li za", "lisa", "ly za", "bét", "bết", "li sa", "lisa pham", "lisa phạm"],
+    "Anastasia": ["anastasia", "a na", "a-na", "a na sờ ta sia", "na sờ ta sia", "a na sta sia", "ana"],
+    "Milina": ["milina", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na"],
+    "Violet": ["violet", "vai ô lét", "vi ô lét", "vai let", "vi let", "vai-o-let"],
+    "Aimi": ["aimi", "ai mi", "ai my", "ay mi"],
+    "Ainsley Mactier": ["ainsley", "mactier", "en xli", "en xly", "mắc ti er", "mác ti ơ", "en-xli", "mắc ti e", "ainsley mactier"],
+    "Stella": ["stella", "sờ te la", "te la", "tét la", "ste la", "ten la"],
+    "Amy": ["amy", "e mi", "ê mi", "ay mi"],
+    "Jack": ["jack", "dách", "dzắc", "giắc", "dắt", "zắc", "giắt"],
+    "Olivia": ["olivia", "ô li via", "li via", "ô li", "ô-li", "o li via"],
+    "Shaelyn": ["shaelyn", "sê lin", "se lin", "sa lin", "sơ lin", "sa e lin", "sa-lin", "se-lin", "xe lin"],
+    "Aroha": ["aroha", "a rô ha", "a ro ha", "ro ha", "a lô ha", "a-ro-ha"],
+    "Viet": ["viet", "việt", "anh việt"],
+    "Jude": ["jude", "dút", "dút đơ", "giu đê", "giu đe"],
+}
+
 
 def normalize_day(text: str) -> Optional[str]:
     low = text.lower().strip()
@@ -63,10 +91,34 @@ def normalize_day(text: str) -> Optional[str]:
     return None
 
 
+def find_employees_in_text(text: str, available_names: List[str]) -> List[str]:
+    """Finds all employees mentioned in text using strict word boundaries and phonetic aliases."""
+    t = " " + text.lower() + " "
+    found = []
+    for real_name in available_names:
+        first = real_name.lower().split()[0]
+        aliases = [real_name.lower(), first] + PHONETIC_ALIASES.get(real_name, []) + PHONETIC_ALIASES.get(first, [])
+        for a in aliases:
+            pattern = (
+                r"(?<![a-zA-Z0-9_àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])"
+                + re.escape(a)
+                + r"(?![a-zA-Z0-9_àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])"
+            )
+            m = re.search(pattern, t)
+            if m:
+                found.append((m.start(), real_name))
+                break
+    found.sort(key=lambda x: x[0])
+    return [name for _, name in found]
+
+
 def match_employee_name(name_query: str, available_names: List[str]) -> Optional[str]:
     q = name_query.lower().strip()
     if not q:
         return None
+    matches = find_employees_in_text(q, available_names)
+    if matches:
+        return matches[0]
     # 1. Exact match
     for name in available_names:
         if name.lower() == q:
@@ -75,11 +127,6 @@ def match_employee_name(name_query: str, available_names: List[str]) -> Optional
     for name in available_names:
         if q in name.lower() or name.lower() in q:
             return name
-    # 3. First name match
-    for name in available_names:
-        first = name.lower().split()[0]
-        if q == first or first in q:
-            return name
     return None
 
 
@@ -87,15 +134,21 @@ def format_shift_time_vi(shift_str: str) -> str:
     s = str(shift_str or "").strip()
     if not s or s.lower() in ["off", "-", "nan", "none"]:
         return "nghỉ"
-    # Convert '06:00 - 14:00' to 'từ 6h sáng tới 2h chiều'
     m = re.search(r"(\d{1,2}):?(\d{2})?\s*[-–]\s*(\d{1,2}):?(\d{2})?", s)
     if m:
         h1 = int(m.group(1))
         m1 = m.group(2) or "00"
         h2 = int(m.group(3))
         m2 = m.group(4) or "00"
-        t1 = f"{h1}h{m1 if m1 != '00' else ''}"
-        t2 = f"{h2}h{m2 if m2 != '00' else ''}"
+
+        p1 = "sáng" if h1 < 12 else ("trưa" if h1 == 12 else "chiều")
+        p2 = "sáng" if h2 < 12 else ("trưa" if h2 == 12 else "chiều")
+
+        h1_disp = h1 if h1 <= 12 else (h1 - 12)
+        h2_disp = h2 if h2 <= 12 else (h2 - 12)
+
+        t1 = f"{h1_disp}h{m1 if m1 != '00' else ''} {p1}"
+        t2 = f"{h2_disp}h{m2 if m2 != '00' else ''} {p2}"
         return f"từ {t1} tới {t2}"
     return s
 
@@ -145,7 +198,13 @@ def execute_roster_action(
         t1_vi = format_shift_time_vi(val1)
         t2_vi = format_shift_time_vi(val2)
 
-        reply = f"Xong rồi nè chị Nhi! Joy đổi ca {day_vi} ({t1_vi}) của {emp1} qua cho {emp2} ({t2_vi}) rồi nghen! 🥖"
+        if t2_vi == "nghỉ":
+            reply = f"Xong rồi nè chị Nhi! Joy đổi ca {day_vi} ({t1_vi}) của {emp1} qua cho {emp2} rồi nghen! 🥖"
+        elif t1_vi == "nghỉ":
+            reply = f"Xong rồi nè chị Nhi! Joy đổi ca {day_vi} ({t2_vi}) của {emp2} qua cho {emp1} rồi nghen! 🥖"
+        else:
+            reply = f"Xong rồi nè chị Nhi! Joy đổi ca {day_vi} giữa {emp1} ({t1_vi}) với {emp2} ({t2_vi}) rồi nghen! 🥖"
+
         action_summary = {"action": "swap_shifts", "emp1": emp1, "emp2": emp2, "day": day, "shift_emp1": val1, "shift_emp2": val2}
         return True, reply, roster_rows, action_summary
 
@@ -225,6 +284,22 @@ def execute_roster_action(
         reply = f"Joy nhớ rồi nè chị Nhi! Từ nay về sau {day_vi if day else 'mọi tuần'} Joy sẽ ưu tiên đúng ý chị dặn ({notes}) nghen! ❤️"
         return True, reply, roster_rows, {"action": "save_manager_preference", "notes": notes}
 
+    elif action_type == "query_or_prompt_shift":
+        emp_raw = params.get("emp", "")
+        emp = match_employee_name(emp_raw, all_emp_names) or emp_raw
+        row = next((r for r in roster_rows if str(r.get("Employee") or "").lower() == emp.lower()), None)
+        cur_val = row.get(day, "") if row else ""
+        if cur_val and cur_val.lower() not in ["off", "-", "nan", "none", ""]:
+            t_vi = format_shift_time_vi(cur_val)
+            reply = f"Dạ chị Nhi, {day_vi} này {emp} đang có ca {t_vi} á. Chị muốn đổi ca này cho bạn nào, hay dời sang mấy giờ dặn Joy làm liền nghen! 🥖"
+        else:
+            reply = f"Dạ chị Nhi, {day_vi} này {emp} đang được nghỉ (OFF) nè. Chị muốn giao ca từ mấy giờ tới mấy giờ cho {emp} dặn Joy nghen! 🥖"
+        return True, reply, roster_rows, {"action": "query_shift", "emp": emp, "day": day}
+
+    elif action_type == "greeting":
+        reply = "Dạ Joy nghe nè chị Nhi! Chị xem bảng lịch trên màn hình rồi dặn Joy đổi ca cho bạn nào, thứ mấy với mấy giờ Joy sửa liền nghen! 🥖✨"
+        return True, reply, roster_rows, {"action": "greeting"}
+
     return False, "Chị Nhi ơi, Joy chưa rõ lệnh này lắm á, chị dặn lại Joy nghen!", roster_rows, {}
 
 
@@ -234,33 +309,22 @@ def parse_intent_rule_based(user_message: str, roster_rows: List[Dict[str, Any]]
     all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows]
 
     day = normalize_day(msg)
+    found_emps = find_employees_in_text(msg, all_emp)
 
-    # 1. Swap shifts: "đổi ca [thứ 4] của [Shaelyn] cho/qua/sang [Milina]"
-    if any(k in msg for k in ["đổi ca", "hoán đổi", "thay ca", "đổi shift", "swap"]):
-        # Find all names mentioned
-        found_emps = [e for e in all_emp if e.lower() in msg]
-        if len(found_emps) >= 2:
-            return "swap_shifts", {"emp1": found_emps[0], "emp2": found_emps[1], "day": day or "Wednesday"}
+    # 1. Two employees mentioned: swap or reassign
+    if len(found_emps) >= 2:
+        return "swap_shifts", {"emp1": found_emps[0], "emp2": found_emps[1], "day": day or "Monday"}
 
-    # 2. Remove shift / give day off: "cho [Jack] nghỉ [thứ 7]" / "thứ 7 cho [Jack] nghỉ"
-    if any(k in msg for k in ["nghỉ", "off", "bỏ ca", "xóa ca"]):
-        found_emps = [e for e in all_emp if e.lower() in msg]
-        if found_emps:
-            return "remove_shift", {"emp": found_emps[0], "day": day or "Saturday"}
+    # 2. One employee mentioned
+    if len(found_emps) == 1:
+        emp = found_emps[0]
+        # Check remove / day off
+        if any(k in msg for k in ["nghỉ", "off", "bỏ ca", "xóa ca", "cho nghỉ", "bỏ", "xóa"]):
+            return "remove_shift", {"emp": emp, "day": day or "Saturday"}
 
-    # 3. Reassign: "chuyển ca [thứ 6] cho [Robert]" / "nhường ca cho [Robert]"
-    if any(k in msg for k in ["chuyển ca", "giao ca", "nhường ca"]):
-        found_emps = [e for e in all_emp if e.lower() in msg]
-        if len(found_emps) == 1:
-            return "reassign_shift", {"from_emp": "", "to_emp": found_emps[0], "day": day or "Friday"}
-        elif len(found_emps) >= 2:
-            return "reassign_shift", {"from_emp": found_emps[0], "to_emp": found_emps[1], "day": day or "Friday"}
-
-    # 4. Adjust time: "cho [Aroha] làm từ 12h tới 17h [chủ nhật]"
-    time_m = re.search(r"(\d{1,2}(?::\d{2}|h\d{0,2})?)\s*(?:tới|đến|-)\s*(\d{1,2}(?::\d{2}|h\d{0,2})?)", msg)
-    if time_m:
-        found_emps = [e for e in all_emp if e.lower() in msg]
-        if found_emps:
+        # Check adjust hours
+        time_m = re.search(r"(\d{1,2}(?::\d{2}|h\d{0,2})?)\s*(?:tới|đến|-)\s*(\d{1,2}(?::\d{2}|h\d{0,2})?)", msg)
+        if time_m:
             t1 = time_m.group(1).replace("h", ":").rstrip(":")
             if ":" not in t1:
                 t1 += ":00"
@@ -274,11 +338,14 @@ def parse_intent_rule_based(user_message: str, roster_rows: List[Dict[str, Any]]
                 t2 = "0" + t2
 
             shift_time = f"{t1} - {t2}"
-            return "adjust_shift_hours", {"emp": found_emps[0], "day": day or "Monday", "shift_time": shift_time}
+            return "adjust_shift_hours", {"emp": emp, "day": day or "Monday", "shift_time": shift_time}
 
-    # 5. Preference instruction: "nhớ từ nay...", "sau này đừng xếp...", "ưu tiên..."
+        # Check change / edit / query shift for this employee
+        if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "đổi", "thay đổi", "xem ca", "ca"]):
+            return "query_or_prompt_shift", {"emp": emp, "day": day or "Monday"}
+
+    # 3. Preference instruction: "nhớ từ nay...", "sau này đừng xếp...", "ưu tiên..."
     if any(k in msg for k in ["nhớ", "sau này", "từ giờ", "từ nay", "ưu tiên"]):
-        found_emps = [e for e in all_emp if e.lower() in msg]
         pref = "AVOID" if any(k in msg for k in ["đừng", "không", "hạn chế"]) else "PREFER"
         emp = found_emps[0] if found_emps else "All"
         return "save_manager_preference", {
@@ -288,6 +355,10 @@ def parse_intent_rule_based(user_message: str, roster_rows: List[Dict[str, Any]]
             "weight": -100 if pref == "AVOID" else 50,
             "notes": user_message,
         }
+
+    # 4. Greeting
+    if any(k in msg for k in ["hello", "chào", "joy ơi", "em ơi", "alo", "hi joy", "troy"]):
+        return "greeting", {}
 
     return None, {}
 

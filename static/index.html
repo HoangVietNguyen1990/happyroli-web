@@ -878,6 +878,10 @@
               <span id="joyMuteText" class="text-[10px] font-black mt-0.5 uppercase tracking-wide">Tắt Mic</span>
             </button>
           </div>
+          <!-- Real-Time Speech Feedback Bubble -->
+          <div id="joyLiveTranscript" class="hidden text-center text-xs font-semibold text-emerald-800 bg-emerald-50 py-1.5 px-3 rounded-xl border border-emerald-200 transition">
+            <span class="text-forest animate-pulse font-bold">🎙️ Đang nghe:</span> <span id="joyLiveTranscriptText" class="italic"></span>
+          </div>
           <div id="joyListeningTip" class="text-center text-[10px] text-gray-500 font-semibold">
             Chạm micro để nói chuyện bằng giọng nói, hoặc chạm Tắt Mic khi nói chuyện riêng nghen!
           </div>
@@ -2202,6 +2206,9 @@
     let isJoyMuted = false;
     let isJoyModalOpen = false;
     let joyTtsEnabled = true;
+    let isJoySpeaking = false;
+    let isJoyCollapsed = false;
+    let currentJoyAudio = null;
 
     function toggleJoyModal() {
       if (isJoyModalOpen) {
@@ -2216,16 +2223,17 @@
       document.getElementById('joyModal').classList.remove('hidden');
       updateJoyToggleButton();
       loadJoyConfig();
-      if (!isJoyMuted) {
-        setTimeout(() => {
-          if (!isJoyListening && isJoyModalOpen) toggleJoyVoice();
-        }, 300);
-      }
+      const tip = document.getElementById('joyListeningTip');
+      if (tip) tip.textContent = 'Chạm micro 🎙️ để nói chuyện bằng giọng nói, hoặc gõ bên dưới nghen!';
     }
 
     function closeJoyModal() {
       isJoyModalOpen = false;
       stopJoyVoice();
+      if (currentJoyAudio) {
+        try { currentJoyAudio.pause(); } catch(e){}
+        currentJoyAudio = null;
+      }
       if (window.speechSynthesis) window.speechSynthesis.cancel();
       document.getElementById('joyModal').classList.add('hidden');
       updateJoyToggleButton();
@@ -2269,8 +2277,8 @@
         }
         if (muteIcon) muteIcon.textContent = "🎙️";
         if (muteText) muteText.textContent = "TẮT MIC";
-        if (tip) tip.textContent = "Chạm micro để nói chuyện bằng giọng nói, hoặc gõ bên dưới nè:";
-        toggleJoyVoice();
+        if (tip) tip.textContent = "🎙️ Joy đang lắng nghe chị Nhi nói nè...";
+        startJoyListening();
       }
     }
 
@@ -2333,56 +2341,99 @@
         return;
       }
       joyRecognition = new SpeechRec();
-      joyRecognition.continuous = false;
-      joyRecognition.interimResults = false;
+      joyRecognition.continuous = true;
+      joyRecognition.interimResults = true;
       joyRecognition.lang = 'vi-VN';
 
       joyRecognition.onstart = () => {
         isJoyListening = true;
-        document.getElementById('joyMicWave').classList.remove('hidden');
-        document.getElementById('joyMicBtn').classList.add('ring-4', 'ring-rose-400');
-        document.getElementById('joyListeningTip').textContent = '🎙️ Joy đang lắng nghe chị Nhi nói nè...';
+        document.getElementById('joyMicWave')?.classList.remove('hidden');
+        document.getElementById('joyMicBtn')?.classList.add('ring-4', 'ring-rose-400');
+        const tip = document.getElementById('joyListeningTip');
+        if (tip && !isJoySpeaking) tip.textContent = '🎙️ Joy đang lắng nghe chị Nhi nói nè...';
       };
 
       joyRecognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        document.getElementById('joyTextInput').value = transcript;
-        sendJoyMessage(transcript);
+        let interimText = '';
+        let finalText = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            finalText += res[0].transcript;
+          } else {
+            interimText += res[0].transcript;
+          }
+        }
+
+        const liveBox = document.getElementById('joyLiveTranscript');
+        const liveText = document.getElementById('joyLiveTranscriptText');
+        if (interimText) {
+          if (liveBox) liveBox.classList.remove('hidden');
+          if (liveText) liveText.textContent = interimText;
+        }
+
+        if (finalText && finalText.trim()) {
+          if (liveBox) liveBox.classList.add('hidden');
+          document.getElementById('joyTextInput').value = finalText.trim();
+          sendJoyMessage(finalText.trim());
+        }
       };
 
       joyRecognition.onerror = (e) => {
         console.warn('Speech error:', e);
-        stopJoyVoice();
-        document.getElementById('joyListeningTip').textContent = 'Joy nghe chưa kịp á, chị chạm micro nói lại hoặc gõ nghen!';
+        if (e.error === 'no-speech') {
+          return;
+        }
+        if (e.error === 'not-allowed') {
+          stopJoyVoice();
+          document.getElementById('joyListeningTip').textContent = '⚠️ Trình duyệt chưa cấp quyền Micro để nói chuyện với Joy á chị Nhi!';
+          return;
+        }
       };
 
       joyRecognition.onend = () => {
-        stopJoyVoice();
+        if (isJoyListening && !isJoyMuted && !isJoySpeaking && isJoyModalOpen) {
+          try {
+            joyRecognition.start();
+          } catch(err) {
+            stopJoyVoice();
+          }
+        } else if (!isJoySpeaking) {
+          stopJoyVoice();
+        }
       };
+    }
+
+    function startJoyListening() {
+      if (isJoyMuted) return;
+      if (!joyRecognition) initJoyVoice();
+      if (!joyRecognition) return;
+      isJoyListening = true;
+      try {
+        joyRecognition.start();
+      } catch (err) {
+        try { joyRecognition.stop(); } catch(e){}
+        setTimeout(() => {
+          try { joyRecognition.start(); } catch(e){}
+        }, 200);
+      }
     }
 
     function toggleJoyVoice() {
       if (isJoyMuted) {
-        isJoyMuted = false;
-        const muteBtn = document.getElementById('joyMuteBtn');
-        const muteIcon = document.getElementById('joyMuteIcon');
-        const muteText = document.getElementById('joyMuteText');
-        if (muteBtn) muteBtn.className = "flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 shadow-sm transition active:scale-95";
-        if (muteIcon) muteIcon.textContent = "🎙️";
-        if (muteText) muteText.textContent = "TẮT MIC";
+        toggleJoyMute();
+        return;
       }
       if (!joyRecognition) initJoyVoice();
       if (!joyRecognition) return;
+
       if (isJoyListening) {
-        joyRecognition.stop();
+        isJoyListening = false;
+        try { joyRecognition.stop(); } catch(e){}
         stopJoyVoice();
       } else {
-        try {
-          joyRecognition.start();
-        } catch (err) {
-          joyRecognition.stop();
-          setTimeout(() => joyRecognition.start(), 200);
-        }
+        startJoyListening();
       }
     }
 
@@ -2390,10 +2441,14 @@
       isJoyListening = false;
       const wave = document.getElementById('joyMicWave');
       const btn = document.getElementById('joyMicBtn');
+      const liveBox = document.getElementById('joyLiveTranscript');
       if (wave) wave.classList.add('hidden');
       if (btn) btn.classList.remove('ring-4', 'ring-rose-400');
+      if (liveBox) liveBox.classList.add('hidden');
       const tip = document.getElementById('joyListeningTip');
-      if (tip) tip.textContent = 'Chạm micro để nói chuyện, hoặc gõ bên dưới nè:';
+      if (tip && !isJoySpeaking && !isJoyMuted) {
+        tip.textContent = 'Chạm micro để nói chuyện, hoặc gõ bên dưới nè:';
+      }
     }
 
     function handleJoySend(e) {
@@ -2481,15 +2536,22 @@
       }
     }
 
-    let isJoyCollapsed = false;
-    let currentJoyAudio = null;
-
     function toggleJoyCollapse() {
       isJoyCollapsed = !isJoyCollapsed;
+      const modal = document.getElementById('joyModal');
       const body = document.getElementById('joyBody');
       const icon = document.getElementById('collapseIcon');
       if (body) {
         body.classList.toggle('hidden', isJoyCollapsed);
+      }
+      if (modal) {
+        if (isJoyCollapsed) {
+          modal.classList.remove('w-[95vw]', 'sm:w-[420px]', 'max-w-[440px]');
+          modal.classList.add('w-auto', 'max-w-[320px]');
+        } else {
+          modal.classList.remove('w-auto', 'max-w-[320px]');
+          modal.classList.add('w-[95vw]', 'sm:w-[420px]', 'max-w-[440px]');
+        }
       }
       if (icon) {
         icon.textContent = isJoyCollapsed ? '🔼' : '🔽';
@@ -2507,25 +2569,61 @@
       const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
       if (!clean) return;
 
+      // Pause mic recognition while Joy is speaking so she doesn't hear herself
+      isJoySpeaking = true;
+      if (joyRecognition && isJoyListening) {
+        try { joyRecognition.stop(); } catch(e){}
+      }
+      const tip = document.getElementById('joyListeningTip');
+      if (tip) tip.textContent = '👧🏻 Em Joy đang nói nè...';
+
+      const resumeListeningAfterTts = () => {
+        isJoySpeaking = false;
+        if (isJoyModalOpen && !isJoyMuted) {
+          const t = document.getElementById('joyListeningTip');
+          if (t) t.textContent = '🎙️ Joy đã nói xong, đang lắng nghe chị Nhi dặn tiếp nè!';
+          isJoyListening = true;
+          try {
+            if (!joyRecognition) initJoyVoice();
+            joyRecognition.start();
+          } catch(e){}
+        }
+      };
+
       // 1. High Quality Vietnamese Female Voice via Backend Stream
       try {
         const audioUrl = '/api/assistant/tts?text=' + encodeURIComponent(clean);
         currentJoyAudio = new Audio(audioUrl);
+        currentJoyAudio.onended = () => {
+          resumeListeningAfterTts();
+        };
+        currentJoyAudio.onerror = () => {
+          fallbackBrowserTts(clean, resumeListeningAfterTts);
+        };
         currentJoyAudio.play().catch(err => {
           console.warn('Backend TTS autoplay blocked or error, falling back to browser TTS:', err);
-          fallbackBrowserTts(clean);
+          fallbackBrowserTts(clean, resumeListeningAfterTts);
         });
       } catch (err) {
-        fallbackBrowserTts(clean);
+        fallbackBrowserTts(clean, resumeListeningAfterTts);
       }
     }
 
-    function fallbackBrowserTts(clean) {
-      if (!window.speechSynthesis) return;
+    function fallbackBrowserTts(clean, onEndCallback) {
+      if (!window.speechSynthesis) {
+        if (onEndCallback) onEndCallback();
+        return;
+      }
       const utter = new SpeechSynthesisUtterance(clean);
       utter.lang = 'vi-VN';
       utter.rate = 1.05;
       utter.pitch = 1.25;
+      utter.onend = () => {
+        if (onEndCallback) onEndCallback();
+      };
+      utter.onerror = () => {
+        if (onEndCallback) onEndCallback();
+      };
       const voices = window.speechSynthesis.getVoices();
       const viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && !v.name.toLowerCase().includes('david') && !v.name.toLowerCase().includes('male'));
       if (viVoice) utter.voice = viVoice;
