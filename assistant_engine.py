@@ -65,9 +65,9 @@ DAYS_VI_NAMES = {
 # Phonetic & speech recognition dictionary for Brumby's Pakenham staff
 PHONETIC_ALIASES = {
     "Jane": [
-        "jane", "chan", "chane", "trên", "chen", "zen", "dzen", "jen", "den", "gen",
+        "jane", "chan", "chane", "trên", "chen", "zen", "dzen", "jen",
         "chên", "trang", "tran", "chiên", "dane", "dzên", "gian", "giang", "san", "shane",
-        "cheyn", "jain", "zane", "sen"
+        "cheyn", "jain", "zane"
     ],
     "Robert": ["robert", "rô bốt", "ro bốt", "rô bớt", "ro bớt", "rô béc", "rô-bớt", "ro béc", "rô-bét"],
     "Elizabeth": [
@@ -79,7 +79,8 @@ PHONETIC_ALIASES = {
         "natasha", "na ta sha", "anatashia", "na ta sia", "a na", "a-na", "anas",
         "a na sờ ta sia", "na sờ ta sia", "a na sta sia", "ana"
     ],
-    "Milina": ["milina", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena"],
+    "Milina": ["milina", "milana", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena"],
+    "Milana": ["milina", "milana", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena"],
     "Violet": ["violet", "vai ô lét", "vi ô lét", "vai let", "vi let", "vai-o-let"],
     "Aimi": ["aimi", "ai mi", "ai my", "ay mi"],
     "Ainsley Mactier": ["ainsley", "mactier", "en xli", "en xly", "mắc ti er", "mác ti ơ", "en-xli", "mắc ti e", "ainsley mactier"],
@@ -94,7 +95,11 @@ PHONETIC_ALIASES = {
 }
 
 ASSISTANT_VOCATIVES = {"joy", "troy", "chơi", "choi", "chơi ơi", "joy ơi", "troy ơi", "em ơi", "troi", "ok chơi ơi", "ok joy", "ok troy"}
-NON_NAME_STOP_WORDS = {"ngày", "thứ", "chơi", "thêm", "được", "không", "giúp", "muốn", "người", "trời", "hãy", "sang", "rời", "dời", "cho", "ca", "giờ", "làm"}
+NON_NAME_STOP_WORDS = {
+    "ngày", "thứ", "chơi", "thêm", "được", "không", "giúp", "muốn", "người", "trời",
+    "hãy", "sang", "rời", "dời", "cho", "ca", "giờ", "làm", "nghen", "nhen", "nghe",
+    "nè", "nhe", "nha", "nó", "nào", "nghỉ", "đổi", "sửa", "xếp", "nên", "vào", "qua"
+}
 
 
 def normalize_day(text: str) -> Optional[str]:
@@ -140,9 +145,11 @@ def find_employees_in_text(text: str, available_names: List[str]) -> List[str]:
         first = real.lower().split()[0]
         alias_to_real[real.lower()] = real
         alias_to_real[first] = real
-        for a in PHONETIC_ALIASES.get(real, []):
-            if a.lower() not in ASSISTANT_VOCATIVES:
-                alias_to_real[a.lower()] = real
+        for k, aliases in PHONETIC_ALIASES.items():
+            if k.lower() == real.lower() or difflib.SequenceMatcher(None, k.lower(), real.lower()).ratio() > 0.8:
+                for a in aliases:
+                    if a.lower() not in ASSISTANT_VOCATIVES and a.lower() not in NON_NAME_STOP_WORDS:
+                        alias_to_real[a.lower()] = real
 
     t = " " + t_clean + " "
     found = []
@@ -486,6 +493,11 @@ def execute_roster_action(
             reply = f"Dạ {day_vi} {emp} đang nghỉ. Chị muốn thêm ca mấy giờ cho {emp} nghen?"
         return True, reply, roster_rows, {"action": "query_shift", "emp": emp, "day": day}
 
+    elif action_type == "unknown_employee":
+        emp_raw = params.get("emp_raw", "")
+        reply = f"Chị Nhi ơi, Joy hổng tìm thấy bạn '{emp_raw}' trong bảng lịch tuần này á!"
+        return False, reply, roster_rows, {}
+
     elif action_type == "greeting":
         raw = str(params.get("raw", "")).lower()
         if any(k in raw for k in ["sao không nói", "không nói gì", "im re", "alo ủa", "sao nó không nói"]):
@@ -544,9 +556,16 @@ def parse_intent_rule_based(
     if len(found_emps) == 1 and len(days) >= 2 and any(k in msg for k in ["dời", "rời", "chuyển", "đổi", "sang", "qua"]):
         return "move_shift_day", {"emp": found_emps[0], "from_day": days[0], "to_day": days[1]}
 
-    # Case A: If user provided a time, but NO employee was mentioned in this turn:
-    if time_str and not found_emps and prev_emp:
-        return "adjust_shift_hours", {"emp": prev_emp, "day": day or prev_day or "Monday", "shift_time": time_str}
+    # Case A: If user provided a time, but NO employee was matched in this turn:
+    if time_str and not found_emps:
+        # Check if user explicitly tried to name an employee who isn't on the roster
+        m_p = re.search(r"(?:cho|của|bạn|nhân viên)\s+([a-zA-Zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+)", msg)
+        if m_p:
+            cand = m_p.group(1).strip()
+            if cand not in NON_NAME_STOP_WORDS and cand not in ASSISTANT_VOCATIVES:
+                return "unknown_employee", {"emp_raw": cand}
+        if prev_emp:
+            return "adjust_shift_hours", {"emp": prev_emp, "day": day or prev_day or "Monday", "shift_time": time_str}
 
     # Case B: If two employees mentioned:
     if len(found_emps) >= 2:
