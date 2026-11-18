@@ -527,6 +527,66 @@
       </div>
       <div id="empTableContainer" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto"></div>
 
+      <!-- Add New Employee & Welcome Email Dispatcher (Matching app.py lines 7920-7985) -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <details class="group">
+          <summary class="bg-gray-50 hover:bg-gray-100 p-4 font-extrabold text-xs text-spruce cursor-pointer flex items-center justify-between transition">
+            <span class="flex items-center gap-2"><span>➕</span> <span>Create New Employee Account &amp; Send Welcome Email</span></span>
+            <span class="text-gray-400 group-open:rotate-180 transition">▼</span>
+          </summary>
+          <div class="p-5 space-y-4 text-xs border-t border-gray-200">
+            <div class="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">Full Name *</label>
+                <input type="text" id="newEmpName" placeholder="e.g. Jack Smith" class="w-full border rounded-lg px-3 py-2 font-bold text-spruce" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">Email Address (for Welcome Email) *</label>
+                <input type="email" id="newEmpEmail" placeholder="e.g. jack.smith@outlook.com" class="w-full border rounded-lg px-3 py-2" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">Username for Login</label>
+                <input type="text" id="newEmpUsername" placeholder="e.g. jack.smith (optional, auto-generated)" class="w-full border rounded-lg px-3 py-2" />
+              </div>
+            </div>
+            <div class="grid sm:grid-cols-4 gap-3">
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">Temporary Password</label>
+                <input type="text" id="newEmpPassword" value="TempPass123!" class="w-full border rounded-lg px-3 py-2 font-mono" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">Role / Position</label>
+                <input type="text" id="newEmpRole" value="Service Staff" class="w-full border rounded-lg px-3 py-2" />
+              </div>
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">Employment Classification</label>
+                <select id="newEmpClass" class="w-full border rounded-lg px-3 py-2 font-bold text-spruce">
+                  <option value="Casual" selected>Casual</option>
+                  <option value="Part-Time">Part-Time</option>
+                  <option value="Full-Time">Full-Time</option>
+                </select>
+              </div>
+              <div>
+                <label class="font-bold block mb-1 text-gray-700">Team</label>
+                <select id="newEmpTeam" class="w-full border rounded-lg px-3 py-2 font-bold text-spruce">
+                  <option value="Service Staff" selected>Service Staff</option>
+                  <option value="Bakery Staff">Bakery Staff</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex items-center justify-between flex-wrap gap-3 pt-2">
+              <label class="flex items-center gap-2 font-bold text-spruce cursor-pointer">
+                <input type="checkbox" id="newEmpSendEmail" checked class="w-4 h-4 accent-forest" />
+                <span>☑️ Automatically dispatch Welcome Email with login details via Gmail SMTP</span>
+              </label>
+              <button onclick="submitCreateNewEmployee()" class="bg-forest hover:bg-spruce text-white font-extrabold px-6 py-2.5 rounded-xl shadow transition">
+                🚀 Create Account &amp; Send Email
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
+
       <!-- Integrated Confidential Employee Profile Viewer -->
       <div class="bg-white rounded-xl shadow-sm border-2 border-gold overflow-hidden">
         <div class="bg-deepgreen text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
@@ -707,15 +767,15 @@
           </div>
         </div>
 
-        <!-- ACTIVE CONSTRAINTS LIST -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-          <div class="flex items-center justify-between mb-3 border-b pb-2">
-            <h4 class="text-xs font-extrabold text-spruce uppercase">📋 My Active Logged Constraints</h4>
-            <span class="text-[11px] text-gray-400">Recorded in live database</span>
-          </div>
-          <div id="staffActiveConstraintsList" class="space-y-2 text-xs"></div>
+      <!-- Active Constraints List with Self-Service Cancellation -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+        <div class="flex items-center justify-between mb-3 border-b pb-2">
+          <h4 class="text-xs font-extrabold text-spruce uppercase">📋 My Active Logged Constraints</h4>
+          <span class="text-[11px] text-gray-400">Recorded in live database • Instant manager email on submit or withdraw</span>
         </div>
+        <div id="staffActiveConstraintsList" class="space-y-2 text-xs"></div>
       </div>
+    </div>
     </section>
 
     <!-- ==================== STORE KIOSK TIMECLOCK ==================== -->
@@ -1556,7 +1616,10 @@
             <div><label class="font-bold block mb-1">Super Membership / Policy #</label><input id="pf_spol_${userKey}" value="${p.super_policy || ''}" class="w-full border rounded-lg px-2.5 py-1.5" /></div>
             <div><label class="font-bold block mb-1">Reset Login Password (Optional)</label><input id="pf_pw_${userKey}" type="password" placeholder="Leave blank to keep current" class="w-full border rounded-lg px-2.5 py-1.5" /></div>
           </div>
-          <button onclick="saveConfidentialProfile('${userKey}')" class="bg-forest hover:bg-spruce text-white font-extrabold px-5 py-2 rounded-lg shadow">💾 Save Confidential Profile Information</button>
+          <div class="flex flex-wrap items-center gap-3 pt-2">
+            <button onclick="saveConfidentialProfile('${userKey}')" class="bg-forest hover:bg-spruce text-white font-extrabold px-5 py-2 rounded-lg shadow">💾 Save Confidential Profile Information</button>
+            <button onclick="resendWelcomeEmail('${userKey}')" class="bg-amber-600 hover:bg-amber-700 text-white font-extrabold px-5 py-2 rounded-lg shadow">📧 Resend Welcome Email</button>
+          </div>
         </div>
       `;
     }
@@ -1596,6 +1659,92 @@
         profilesCache = data.profiles;
         populateAdminProfileSelect();
         alert(`🎉 Created ${data.created_count} missing employee login accounts (Password: TempPass123!)`);
+      }
+    }
+
+    async function resendWelcomeEmail(userKey) {
+      const emailInput = document.getElementById(`pf_email_${userKey}`);
+      const nameInput = document.getElementById(`pf_name_${userKey}`);
+      const recipient = (emailInput ? emailInput.value : '').trim();
+      const empName = (nameInput ? nameInput.value : userKey).trim();
+      if (!recipient) {
+        return alert('Please enter an Email Address in the profile first.');
+      }
+      if (!confirm(`Dispatch Welcome Onboarding Email to ${empName} (${recipient}) with login credentials?`)) return;
+
+      try {
+        const res = await fetch('/api/notify/welcome', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipient_email: recipient,
+            emp_name: empName,
+            username: userKey,
+            temp_password: 'TempPass123!'
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert(`🎉 Welcome email successfully delivered to ${recipient}!`);
+        } else {
+          alert(`⚠️ Email delivery issue: ${data.message || data.error}`);
+        }
+      } catch (e) {
+        alert(`Error sending email: ${e.message}`);
+      }
+    }
+
+    async function submitCreateNewEmployee() {
+      const name = (document.getElementById('newEmpName').value || '').trim();
+      const email = (document.getElementById('newEmpEmail').value || '').trim();
+      const username = (document.getElementById('newEmpUsername').value || '').trim();
+      const password = (document.getElementById('newEmpPassword').value || '').trim() || 'TempPass123!';
+      const role = (document.getElementById('newEmpRole').value || '').trim();
+      const classification = document.getElementById('newEmpClass').value;
+      const team = document.getElementById('newEmpTeam').value;
+      const sendEmail = document.getElementById('newEmpSendEmail').checked;
+
+      if (!name) return alert('Please enter the employee full name.');
+      if (sendEmail && !email) return alert('Please enter an email address to dispatch the welcome email.');
+
+      try {
+        const res = await fetch('/api/employees/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            email,
+            username,
+            password,
+            role,
+            classification,
+            team,
+            send_welcome_email: sendEmail
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          profilesCache = data.profiles || profilesCache;
+          datasetsCache.employees = data.employees || datasetsCache.employees;
+          populateAdminProfileSelect();
+          loadStaffTable();
+          let msg = `🎉 Account created for ${name}!`;
+          if (sendEmail) {
+            if (data.email_sent) {
+              msg += `\n\n✉️ Welcome email dispatched to ${email}.`;
+            } else {
+              msg += `\n\n⚠️ Email notification status: ${data.email_message}`;
+            }
+          }
+          alert(msg);
+          document.getElementById('newEmpName').value = '';
+          document.getElementById('newEmpEmail').value = '';
+          document.getElementById('newEmpUsername').value = '';
+        } else {
+          alert(`Error creating employee: ${data.error || data.message}`);
+        }
+      } catch (err) {
+        alert(`Failed to create employee: ${err.message}`);
       }
     }
 
@@ -1752,10 +1901,55 @@
       const unavRes = await fetch('/api/dataset/unavailability');
       const unavData = await unavRes.json();
       datasetsCache.unavailability = unavData.records || [];
-      const myRows = datasetsCache.unavailability.filter(u => (u.Employee || '').toLowerCase().includes(empName.toLowerCase().split(' ')[0]));
+      const myRows = [];
+      datasetsCache.unavailability.forEach((u, idx) => {
+        if ((u.Employee || '').toLowerCase().includes(empName.toLowerCase().split(' ')[0])) {
+          myRows.push({ ...u, _rawIdx: idx });
+        }
+      });
       document.getElementById('staffActiveConstraintsList').innerHTML = myRows.length
-        ? myRows.map(u => `<div class="flex items-center justify-between p-2 bg-gray-50 rounded border"><span>🗓️ <b>${u.Day}</b></span><span class="bg-amber-700 text-white px-2.5 py-0.5 rounded-full font-bold">${u['Time Window']}</span></div>`).join('')
+        ? myRows.map(u => `
+            <div class="flex items-center justify-between p-2.5 bg-gray-50 rounded-xl border border-gray-200">
+              <div class="flex items-center gap-2">
+                <span>🗓️ <b>${u.Day}</b></span>
+                <span class="bg-amber-700 text-white text-[11px] px-2.5 py-0.5 rounded-full font-bold">${u['Time Window']}</span>
+              </div>
+              <button onclick="deleteStaffConstraint(${u._rawIdx})" class="text-red-600 hover:text-red-800 text-xs font-bold px-2.5 py-1 rounded-lg border border-red-200 hover:bg-red-50 transition">
+                🗑️ Remove
+              </button>
+            </div>
+          `).join('')
         : '<div class="text-emerald-700 font-semibold">🎉 You have no logged unavailability constraints!</div>';
+    }
+
+    async function deleteStaffConstraint(rawIdx) {
+      const empName = document.getElementById('staffUserSelect').value;
+      if (rawIdx < 0 || rawIdx >= datasetsCache.unavailability.length) return;
+      const target = datasetsCache.unavailability[rawIdx];
+      const day = target.Day || 'Unknown Day';
+      const win = target['Time Window'] || 'Unknown Time';
+
+      if (!confirm(`Are you sure you want to remove your unavailability constraint for ${day} (${win})?`)) return;
+
+      datasetsCache.unavailability.splice(rawIdx, 1);
+      await saveDataset('unavailability');
+
+      try {
+        await fetch('/api/notify/unavailability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee: empName,
+            action: 'Withdrew / Removed Unavailability Constraint',
+            details: `• Removed constraint on ${day}: ${win}`
+          })
+        });
+      } catch (err) {
+        console.warn('Notification error:', err);
+      }
+
+      alert(`✅ Removed constraint for ${day}. Shop owners have been notified via email.`);
+      refreshStaffPortal();
     }
 
     function setAvailPreset(preset) {
@@ -1802,17 +1996,37 @@
 
       const rangeNote = `From ${sDate} to ${eDate}`;
       let added = 0;
+      const addedLines = [];
       DAYS.forEach(d => {
         if (document.getElementById(`st_chk_${d}`).checked) {
           const tType = document.getElementById(`st_type_${d}`).value;
           const spec = document.getElementById(`st_win_${d}`).value.trim();
           const win = tType === 'Specific Time' ? (spec || 'Specific Time') : 'All Day';
-          datasetsCache.unavailability.push({ Employee: empName, Day: d, "Time Window": `${win} (${rangeNote})` });
+          const fullWin = `${win} (${rangeNote})`;
+          datasetsCache.unavailability.push({ Employee: empName, Day: d, "Time Window": fullWin });
+          addedLines.push(`• ${d}: ${fullWin}`);
           added++;
         }
       });
       if (!added) return alert('Please check at least one day of the week in Step 2.');
       await saveDataset('unavailability');
+
+      // Dispatch automated notification email to shop owners
+      try {
+        await fetch('/api/notify/unavailability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employee: empName,
+            action: 'Logged Weekly Constraints',
+            details: addedLines.join('\n')
+          })
+        });
+      } catch (err) {
+        console.warn('Email notify error:', err);
+      }
+
+      alert(`✅ Unavailability submitted for ${added} day(s)! Shop owners have been notified via email.`);
       refreshStaffPortal();
     }
 

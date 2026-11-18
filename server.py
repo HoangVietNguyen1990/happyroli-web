@@ -2,8 +2,12 @@ import csv
 import io
 import json
 import os
+import re
+import smtplib
 import sys
 from datetime import date, datetime, timedelta, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -36,6 +40,222 @@ from core_engine import (
 
 db = HappyRollyDB()
 STATIC_DIR = os.path.join(HAPPYROLLY_DIR, "static")
+
+# --- SMTP EMAIL NOTIFICATION ENGINE ---
+DEFAULT_SMTP_CONFIG = {
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "sender_email": "Brumby.pakenham@gmail.com",
+    "sender_password": "vtgz hboh ynqk uhrw",
+    "portal_url": "https://roster.happyroli.com.au",
+    "sender_name": "Brumby's Bakery Manager",
+    "notification_recipients": "quietsong2006@yahoo.com, uyentrinhtran2309@gmail.com",
+}
+
+
+def load_smtp_config() -> dict:
+    cfg = DEFAULT_SMTP_CONFIG.copy()
+    disk_file = os.path.join(PROJECT_ROOT, "data", "smtp_config.json")
+    if os.path.exists(disk_file):
+        try:
+            with open(disk_file, "r", encoding="utf-8") as f:
+                disk_cfg = json.load(f)
+                if isinstance(disk_cfg, dict):
+                    for k, v in disk_cfg.items():
+                        if v or k not in cfg:
+                            cfg[k] = v
+        except Exception:
+            pass
+    db_cfg = db.load_system_doc("smtp_config")
+    if db_cfg and isinstance(db_cfg, dict):
+        for k, v in db_cfg.items():
+            if v or k not in cfg:
+                cfg[k] = v
+    if not cfg.get("portal_url") or "streamlit" in str(cfg.get("portal_url")):
+        cfg["portal_url"] = "https://roster.happyroli.com.au"
+    return cfg
+
+
+def save_smtp_config(cfg: dict) -> bool:
+    db.save_system_doc("smtp_config", cfg)
+    disk_file = os.path.join(PROJECT_ROOT, "data", "smtp_config.json")
+    try:
+        with open(disk_file, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception:
+        pass
+    return True
+
+
+def _clean_smtp_password(raw_pass: str, smtp_server: str = "") -> str:
+    s = str(raw_pass or "").strip()
+    if "gmail" in str(smtp_server).lower():
+        s = s.replace(" ", "")
+    return s
+
+
+def _connect_and_login_smtp(smtp_server: str, smtp_port: int, sender_email: str, sender_pass: str, timeout: int = 12):
+    clean_pass = _clean_smtp_password(sender_pass, smtp_server)
+    port = int(smtp_port)
+    if port == 465:
+        server = smtplib.SMTP_SSL(smtp_server, port, timeout=timeout)
+        server.ehlo()
+    else:
+        server = smtplib.SMTP(smtp_server, port, timeout=timeout)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+    server.login(sender_email, clean_pass)
+    return server
+
+
+def send_welcome_email_smtp(
+    recipient_email: str,
+    emp_name: str,
+    username: str,
+    temp_password: str,
+    portal_url: str = "",
+    sender_name: str = "",
+) -> tuple:
+    cfg = load_smtp_config()
+    smtp_server = cfg.get("smtp_server", "smtp.gmail.com")
+    smtp_port = int(cfg.get("smtp_port", 587))
+    sender_email = cfg.get("sender_email", "").strip()
+    sender_pass = cfg.get("sender_password", "").strip()
+    if not portal_url:
+        portal_url = cfg.get("portal_url", "https://roster.happyroli.com.au")
+    if not sender_name:
+        sender_name = cfg.get("sender_name", "Brumby's Bakery Manager")
+
+    if not recipient_email or not str(recipient_email).strip():
+        return False, "Recipient email address is blank."
+    if not sender_email or not sender_pass:
+        return False, "SMTP credentials are not configured in system settings."
+
+    subject = "Welcome to Brumby's Pakenham! 🥐 — Your Account Setup & Portal Login"
+    body = f"""Hi {emp_name},
+
+Welcome to the team at Brumby's Pakenham! 🥐
+
+We use an online portal for managing shift rostering, weekly availability, and employee onboarding. Please set up your account by completing these quick steps:
+
+1. Log In to the Portal:
+Website: {portal_url}
+Username: {username}
+Temporary Password: {temp_password}
+
+2. Complete Your Setup Tasks:
+Once logged in, please complete the following tabs:
+📋 Personal Information Form: Fill out your contact details, Tax File Number (TFN), bank account details (for payroll), and superannuation fund.
+📅 My Availability & Constraints: Select the days and time windows you are available to work.
+
+If you run into any issues, please feel free to reach out to store management.
+
+Welcome aboard!
+{sender_name}
+Brumby's Pakenham
+"""
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = f"{sender_name} <{sender_email}>"
+        msg["To"] = recipient_email.strip()
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+        server = _connect_and_login_smtp(smtp_server, smtp_port, sender_email, sender_pass)
+        server.send_message(msg)
+        server.quit()
+        return True, f"Welcome email delivered to {recipient_email}!"
+    except smtplib.SMTPAuthenticationError:
+        return False, "Gmail authentication failed (Error 535). Please verify the 16-character Google App Password."
+    except Exception as e:
+        return False, f"SMTP Error: {e}"
+
+
+def send_availability_notification_email_smtp(emp_name: str, action_type: str, details_str: str) -> tuple:
+    cfg = load_smtp_config()
+    smtp_server = cfg.get("smtp_server", "smtp.gmail.com")
+    smtp_port = int(cfg.get("smtp_port", 587))
+    sender_email = cfg.get("sender_email", "").strip()
+    sender_pass = cfg.get("sender_password", "").strip()
+    sender_name = cfg.get("sender_name", "Brumby's Bakery Manager")
+
+    recipients_raw = cfg.get("notification_recipients", "quietsong2006@yahoo.com, uyentrinhtran2309@gmail.com")
+    recipient_list = [r.strip() for r in re.split(r"[,;]", str(recipients_raw)) if r.strip()]
+    if not recipient_list:
+        recipient_list = ["quietsong2006@yahoo.com", "uyentrinhtran2309@gmail.com"]
+
+    if not sender_email or not sender_pass:
+        return False, "SMTP credentials are not configured."
+
+    subject = f"📅 Staff Availability Alert: {emp_name} — {action_type}"
+    now_str = datetime.now().strftime("%d/%m/%Y at %I:%M %p")
+
+    body = f"""Staff Availability Notification Alert 🥐
+Brumby's Pakenham
+
+Employee Name: {emp_name}
+Action: {action_type}
+Timestamp: {now_str}
+
+Details of Availability Change:
+{details_str}
+
+This is an automated notification sent from the Brumby's Bakery Portal (https://roster.happyroli.com.au) to keep store owners informed of staff availability updates.
+"""
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = f"{sender_name} <{sender_email}>"
+        msg["To"] = ", ".join(recipient_list)
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+
+        server = _connect_and_login_smtp(smtp_server, smtp_port, sender_email, sender_pass)
+        server.send_message(msg)
+        server.quit()
+        return True, f"Notification sent to {', '.join(recipient_list)}"
+    except Exception as e:
+        return False, f"SMTP Error: {e}"
+
+
+def send_test_email_smtp(recipient_email: str) -> tuple:
+    cfg = load_smtp_config()
+    smtp_server = cfg.get("smtp_server", "smtp.gmail.com")
+    smtp_port = int(cfg.get("smtp_port", 587))
+    sender_email = cfg.get("sender_email", "").strip()
+    sender_pass = cfg.get("sender_password", "").strip()
+    sender_name = cfg.get("sender_name", "Brumby's Bakery Manager")
+
+    if not recipient_email or not str(recipient_email).strip():
+        return False, "Recipient email is blank."
+    if not sender_email or not sender_pass:
+        return False, "SMTP credentials not configured."
+
+    subject = "🧪 Test Notification — Brumby's Bakery Portal"
+    now_str = datetime.now().strftime("%d/%m/%Y at %I:%M %p")
+    test_body = f"""Hello!
+
+This is a test notification from the Brumby's Bakery Portal (https://roster.happyroli.com.au) to verify your automated email delivery setup.
+
+Sender: {sender_email}
+SMTP Server: {smtp_server}:{smtp_port}
+Timestamp: {now_str}
+
+If you received this message, automated notifications for new employee welcome emails and staff unavailability alerts are fully functional! 🎉
+"""
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = f"{sender_name} <{sender_email}>"
+        msg["To"] = recipient_email.strip()
+        msg["Subject"] = subject
+        msg.attach(MIMEText(test_body, "plain", "utf-8"))
+
+        server = _connect_and_login_smtp(smtp_server, smtp_port, sender_email, sender_pass)
+        server.send_message(msg)
+        server.quit()
+        return True, f"Test email successfully delivered to {recipient_email}!"
+    except Exception as e:
+        return False, f"Test Email Error: {e}"
 
 
 def get_melbourne_now() -> datetime:
@@ -414,6 +634,15 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "date_str": date_str, "records": records, "wages": wages})
             return
 
+        if path == "/api/smtp-config":
+            cfg = load_smtp_config().copy()
+            pw = cfg.get("sender_password", "")
+            cfg["has_password"] = bool(pw)
+            cfg["masked_password"] = "••••••••••••" if pw else ""
+            cfg.pop("sender_password", None)
+            self._send_json(200, {"ok": True, "config": cfg})
+            return
+
         if path.startswith("/api/system/"):
             doc_key = path.replace("/api/system/", "").strip("/")
             payload = db.load_system_doc(doc_key)
@@ -547,6 +776,114 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
                 created += 1
             db.save_system_doc("user_profiles", profiles)
             self._send_json(200, {"ok": True, "created_count": created, "profiles": profiles})
+            return
+
+        if path == "/api/notify/welcome":
+            recip = str(body.get("recipient_email", "")).strip()
+            name = str(body.get("emp_name", "")).strip()
+            user = str(body.get("username", "")).strip()
+            pwd = str(body.get("temp_password", "TempPass123!")).strip()
+            portal_url = str(body.get("portal_url", "")).strip()
+            ok, msg = send_welcome_email_smtp(recip, name, user, pwd, portal_url)
+            self._send_json(200, {"ok": ok, "message": msg})
+            return
+
+        if path == "/api/notify/unavailability":
+            emp = str(body.get("employee", "")).strip()
+            action = str(body.get("action", "Logged Weekly Constraints")).strip()
+            details = str(body.get("details", "")).strip()
+            ok, msg = send_availability_notification_email_smtp(emp, action, details)
+            self._send_json(200, {"ok": ok, "message": msg})
+            return
+
+        if path == "/api/notify/test-email":
+            recip = str(body.get("recipient_email", "")).strip()
+            if not recip:
+                cfg = load_smtp_config()
+                recip = cfg.get("sender_email", "")
+            ok, msg = send_test_email_smtp(recip)
+            self._send_json(200, {"ok": ok, "message": msg})
+            return
+
+        if path == "/api/smtp-config":
+            curr = load_smtp_config()
+            for k in ("smtp_server", "smtp_port", "sender_email", "sender_name", "portal_url", "notification_recipients"):
+                if k in body and str(body[k]).strip():
+                    curr[k] = str(body[k]).strip()
+            if body.get("sender_password"):
+                curr["sender_password"] = str(body["sender_password"]).strip()
+            save_smtp_config(curr)
+            self._send_json(200, {"ok": True, "message": "SMTP email configuration updated successfully!"})
+            return
+
+        if path == "/api/employees/create":
+            new_name = str(body.get("name", "")).strip()
+            new_user = str(body.get("username", "")).strip().lower()
+            new_pass = str(body.get("password", "TempPass123!")).strip()
+            new_email = str(body.get("email", "")).strip()
+            new_role = str(body.get("role", "Junior Team Member")).strip()
+            new_type = str(body.get("classification", "Casual")).strip()
+            new_team = str(body.get("team", "Service Staff")).strip()
+            new_dob = str(body.get("dob", "")).strip()
+            send_welcome = bool(body.get("send_welcome_email", True))
+
+            if not new_name:
+                self._send_json(400, {"ok": False, "error": "Employee name cannot be empty."})
+                return
+            if not new_user:
+                new_user = new_name.lower().replace(" ", ".")
+
+            profiles = db.load_system_doc("user_profiles") or {}
+            profiles[new_user] = {
+                "username": new_user,
+                "password": new_pass,
+                "role": "Employee",
+                "employee_name": new_name,
+                "profile": {
+                    "full_name": new_name,
+                    "email": new_email,
+                    "store": "Brumby's Pakenham",
+                    "classification": new_type,
+                    "employment_level": new_role,
+                    "dob": new_dob,
+                    "commencement_date": datetime.now().strftime("%d/%m/%Y"),
+                },
+            }
+            db.save_system_doc("user_profiles", profiles)
+
+            emps = db.load_records("employees") or []
+            existing_emp = next((e for e in emps if str(e.get("NAME") or e.get("Name", "")).strip().lower() == new_name.lower()), None)
+            if existing_emp:
+                existing_emp["position"] = new_role
+                existing_emp["status"] = new_type.lower()
+                existing_emp["Team"] = new_team
+                if new_dob:
+                    existing_emp["DOB"] = new_dob
+            else:
+                emps.append({
+                    "NAME": new_name,
+                    "Team": new_team,
+                    "DOB": new_dob,
+                    "Commencing Date": datetime.now().strftime("%d/%m/%Y"),
+                    "status": new_type.lower(),
+                    "position": new_role,
+                })
+            emps = sort_records_by_team_and_age(emps)
+            db.save_records("employees", emps)
+
+            email_sent = False
+            email_msg = "Welcome email not requested."
+            if send_welcome and new_email:
+                email_sent, email_msg = send_welcome_email_smtp(new_email, new_name, new_user, new_pass)
+
+            self._send_json(200, {
+                "ok": True,
+                "message": f"Created account for {new_name}!",
+                "email_sent": email_sent,
+                "email_message": email_msg,
+                "profiles": profiles,
+                "employees": emps,
+            })
             return
 
         if path == "/api/solve":
