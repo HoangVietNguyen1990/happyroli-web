@@ -2248,38 +2248,6 @@
       }
     }
 
-    function getBestVietnameseVoice() {
-      if (!window.speechSynthesis) return null;
-      if (cachedBestVoice) return cachedBestVoice;
-      const voices = window.speechSynthesis.getVoices();
-      if (!voices || voices.length === 0) return null;
-
-      // 1. Female Vietnamese voice
-      let viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && 
-        (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('linh') || 
-         v.name.toLowerCase().includes('mai') || v.name.toLowerCase().includes('chi') || 
-         v.name.toLowerCase().includes('hoaimy') || v.name.toLowerCase().includes('nu')));
-      
-      // 2. Any Vietnamese voice (avoid male)
-      if (!viVoice) {
-        viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && 
-          !v.name.toLowerCase().includes('male') && !v.name.toLowerCase().includes('nam') && !v.name.toLowerCase().includes('david'));
-      }
-      if (!viVoice) {
-        viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VN'));
-      }
-
-      if (viVoice) cachedBestVoice = viVoice;
-      return viVoice;
-    }
-
-    if (window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        cachedBestVoice = null;
-        getBestVietnameseVoice();
-      };
-    }
-
     function toggleJoyModal() {
       if (isJoyModalOpen) {
         closeJoyWithFarewell();
@@ -2295,7 +2263,6 @@
       updateJoyToggleButton();
       loadJoyConfig();
       initJoyStaticAudios();
-      getBestVietnameseVoice();
       const tip = document.getElementById('joyListeningTip');
       if (tip) tip.textContent = 'Chạm micro 🎙️ để nói chuyện bằng giọng nói, hoặc gõ bên dưới nghen!';
     }
@@ -2320,13 +2287,10 @@
       const tip = document.getElementById('joyListeningTip');
       if (tip) tip.textContent = '👧🏻 Dạ Joy tắt đây, chào chị Nhi nghen! ✨';
 
-      initJoyStaticAudios();
-
       let hasFinished = false;
       const finishClose = () => {
         if (hasFinished) return;
         hasFinished = true;
-        // Dập âm hoàn toàn (silence audio)
         if (joyByeAudio) {
           try { joyByeAudio.pause(); joyByeAudio.currentTime = 0; } catch(e){}
         }
@@ -2339,47 +2303,24 @@
         updateJoyToggleButton();
       };
 
+      initJoyStaticAudios();
       if (joyByeAudio) {
         joyByeAudio.onended = finishClose;
-        joyByeAudio.onerror = () => {
-          fallbackSpeechSynthesisFarewell(finishClose);
-        };
+        joyByeAudio.onerror = finishClose;
         try {
           joyByeAudio.currentTime = 0;
           const p = joyByeAudio.play();
           if (p && typeof p.then === 'function') {
-            p.catch(() => fallbackSpeechSynthesisFarewell(finishClose));
+            p.catch(finishClose);
           }
         } catch(e) {
-          fallbackSpeechSynthesisFarewell(finishClose);
+          finishClose();
         }
       } else {
-        fallbackSpeechSynthesisFarewell(finishClose);
+        finishClose();
       }
 
-      setTimeout(finishClose, 3500);
-    }
-
-    function fallbackSpeechSynthesisFarewell(onEndCallback) {
-      if (window.speechSynthesis) {
-        try {
-          window.speechSynthesis.cancel();
-          const u = new SpeechSynthesisUtterance('Dạ Joy tắt đây, chào chị Nhi nghen!');
-          u.lang = 'vi-VN';
-          u.rate = 1.25;
-          u.pitch = 1.55; // High pitch = sweet young girl
-          const viVoice = getBestVietnameseVoice();
-          if (viVoice) u.voice = viVoice;
-          u.onend = onEndCallback;
-          u.onerror = onEndCallback;
-          window.activeJoyAckUtterance = u;
-          window.speechSynthesis.speak(u);
-        } catch(e) {
-          if (onEndCallback) onEndCallback();
-        }
-      } else {
-        if (onEndCallback) onEndCallback();
-      }
+      setTimeout(finishClose, 2500);
     }
 
     function closeJoyModal() {
@@ -2673,40 +2614,14 @@
       if (tip) tip.textContent = '👧🏻 Dạ! Joy đang làm nè...';
 
       initJoyStaticAudios();
-
-      let played = false;
       if (joyDaAudio) {
         try {
           joyDaAudio.currentTime = 0;
           const p = joyDaAudio.play();
           if (p && typeof p.then === 'function') {
-            p.then(() => { played = true; }).catch(() => {
-              fallbackDa();
-            });
-          } else {
-            played = true;
+            p.catch(() => {});
           }
-        } catch(e) {
-          fallbackDa();
-        }
-      } else {
-        fallbackDa();
-      }
-
-      function fallbackDa() {
-        if (window.speechSynthesis) {
-          try {
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance('Dạ!');
-            u.lang = 'vi-VN';
-            u.rate = 1.35;
-            u.pitch = 1.55; // High pitch = young girl
-            const viVoice = getBestVietnameseVoice();
-            if (viVoice) u.voice = viVoice;
-            window.activeJoyAckUtterance = u;
-            window.speechSynthesis.speak(u);
-          } catch(e){}
-        }
+        } catch(e) {}
       }
     }
 
@@ -2832,90 +2747,30 @@
         }, 500);
       };
 
-      // Try High-Quality Neural Young Girl Voice via server first
+      // High-Quality Neural Young Girl Voice via server (NO adult speechSynthesis)
       const audioUrl = '/api/assistant/tts?text=' + encodeURIComponent(clean);
       const audio = new Audio(audioUrl);
       currentJoyAudio = audio;
 
-      let fallbackStarted = false;
-      const doLocalFallback = () => {
-        if (fallbackStarted || isFinished) return;
-        fallbackStarted = true;
-        if (currentJoyAudio) {
-          try { currentJoyAudio.pause(); } catch(e){}
-          currentJoyAudio = null;
-        }
-        speakChunksWithSpeechSynthesis(clean, finishSpeech);
-      };
-
-      const loadTimeout = setTimeout(() => {
-        if (!audio.currentTime || audio.paused) {
-          doLocalFallback();
-        }
-      }, 4000);
-
-      audio.onplay = () => {
-        clearTimeout(loadTimeout);
-      };
       audio.onended = () => {
-        clearTimeout(loadTimeout);
         finishSpeech();
       };
-      audio.onerror = () => {
-        clearTimeout(loadTimeout);
-        doLocalFallback();
+      audio.onerror = (e) => {
+        console.warn('[Joy TTS] Audio error:', e);
+        finishSpeech();
       };
 
       try {
         const p = audio.play();
         if (p && typeof p.then === 'function') {
-          p.catch(() => doLocalFallback());
+          p.catch((err) => {
+            console.warn('[Joy TTS] Play rejected:', err);
+            finishSpeech();
+          });
         }
       } catch(e) {
-        doLocalFallback();
+        finishSpeech();
       }
-    }
-
-    function speakChunksWithSpeechSynthesis(clean, onComplete) {
-      const rawSentences = clean.split(/(?<=[.!?])\s+/).filter(s => s && s.trim());
-      const sentences = rawSentences.length > 0 ? rawSentences : [clean];
-      const viVoice = getBestVietnameseVoice();
-
-      let currentIndex = 0;
-      let safetyTimer = null;
-      window.activeJoyUtterances = [];
-
-      const onAllDone = () => {
-        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-        if (onComplete) onComplete();
-      };
-
-      safetyTimer = setTimeout(onAllDone, Math.max(25000, clean.length * 150));
-
-      function speakNextChunk() {
-        if (currentIndex >= sentences.length) {
-          onAllDone();
-          return;
-        }
-
-        const chunkText = sentences[currentIndex++];
-        const utter = new SpeechSynthesisUtterance(chunkText);
-        utter.lang = 'vi-VN';
-        utter.rate = 1.25; // Speaks quickly and cheerfully
-        utter.pitch = 1.55; // High pitch = youthful 18-20yo girl tone
-        if (viVoice) utter.voice = viVoice;
-
-        utter.onend = () => speakNextChunk();
-        utter.onerror = (err) => {
-          console.warn('[Joy TTS] utterance error:', err);
-          speakNextChunk();
-        };
-
-        window.activeJoyUtterances.push(utter);
-        window.speechSynthesis.speak(utter);
-      }
-
-      speakNextChunk();
     }
 
     async function kioskClock(action) {

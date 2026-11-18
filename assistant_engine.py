@@ -67,47 +67,52 @@ PHONETIC_ALIASES = {
     "Jane": [
         "jane", "chan", "chane", "trên", "chen", "zen", "dzen", "jen",
         "chên", "trang", "tran", "chiên", "dane", "dzên", "gian", "giang", "san", "shane",
-        "cheyn", "jain", "zane"
+        "cheyn", "jain", "zane", "chê anh", "chê-anh", "chê in", "xem", "xen", "sen", "chenh", "chênh", "dzen", "zenh"
     ],
-    "Robert": ["robert", "rô bốt", "ro bốt", "rô bớt", "ro bớt", "rô béc", "rô-bớt", "ro béc", "rô-bét"],
+    "Robert": ["robert", "rô bốt", "ro bốt", "rô bớt", "ro bớt", "rô béc", "rô-bớt", "ro béc", "rô-bét", "rô bét", "rô bắt", "ro bot", "ro-bot", "rô bơ"],
     "Elizabeth": [
         "elizabeth", "helizabeth", "ê li za bét", "ê li za bet", "ê li", "ê-li", "li za", "lisa", "ly za",
-        "bét", "bết", "li sa", "lisa pham", "lisa phạm", "e li", "e-li", "li-za", "hê li za bét", "elisabeth"
+        "bét", "bết", "li sa", "lisa pham", "lisa phạm", "e li", "e-li", "li-za", "hê li za bét", "elisabeth", "ê li sa"
     ],
     "Anastasia": [
         "anastasia", "annastasia", "anatasia", "annatasia", "anastacia", "anastatia", "anastasiya",
         "natasha", "na ta sha", "anatashia", "na ta sia", "a na", "a-na", "anas",
-        "a na sờ ta sia", "na sờ ta sia", "a na sta sia", "ana"
+        "a na sờ ta sia", "na sờ ta sia", "a na sta sia", "ana", "a ná"
     ],
-    "Milina": ["milina", "milana", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena"],
-    "Milana": ["milina", "milana", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena"],
-    "Violet": ["violet", "vai ô lét", "vi ô lét", "vai let", "vi let", "vai-o-let"],
+    "Milina": ["milina", "milana", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena", "mỹ na", "mì na"],
+    "Milana": ["milina", "milana", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena", "mỹ na", "mì na"],
+    "Violet": ["violet", "vai ô lét", "vi ô lét", "vai let", "vi let", "vai-o-let", "vai ô", "vai o let", "va lét"],
     "Aimi": [
         "aimi", "ai mi", "ai mì", "ai my", "ai mỳ", "ay mi", "ay my",
         "ai-mi", "ai-mì", "ai-my", "e mi", "ê mi", "e mì", "ê mì",
-        "a mi", "a mì", "aimy", "em mi", "em mì", "mai mày", "mai may"
+        "a mi", "a mì", "aimy", "em mi", "em mì", "mai mày", "mai may", "ai mĩ"
     ],
     "Ainsley Mactier": [
         "ainsley", "mactier", "en xli", "en xly", "mắc ti er", "mác ti ơ", "en-xli",
-        "mắc ti e", "ainsley mactier", "en-xi-li", "en xi li", "en-xờ-li"
+        "mắc ti e", "ainsley mactier", "en-xi-li", "en xi li", "en-xờ-li", "en li", "en xì"
     ],
-    "Stella": ["stella", "sờ te la", "te la", "tét la", "ste la", "ten la"],
-    "Amy": ["amy", "e mi", "ê mi", "ay mi"],
-    "Jack": ["jack", "dách", "dắc", "giắc", "dắt", "zắc", "giắt"],
-    "Olivia": ["olivia", "ô li via", "li via", "ô li", "ô-li", "o li via"],
-    "Shaelyn": ["shaelyn", "sê lin", "se lin", "sa lin", "sơ lin", "sa e lin", "sa-lin", "se-lin", "xe lin", "shaelynn"],
-    "Aroha": ["aroha", "aloha", "a rô ha", "a ro ha", "ro ha", "a lô ha", "a-ro-ha", "a lo ha", "lo ha"],
-    "Viet": ["viet", "việt", "anh việt"],
-    "Jude": ["jude", "dút", "dút đơ", "giu đê", "giu đe"],
+    "Stella": ["stella", "sờ te la", "te la", "tét la", "ste la", "ten la", "tê la", "te-la"],
+    "Amy": ["amy", "e mi", "ê mi", "ay mi", "e my"],
+    "Jack": ["jack", "dách", "dắc", "giắc", "dắt", "zắc", "giắt", "chắc", "déc"],
+    "Olivia": ["olivia", "ô li via", "li via", "ô li", "ô-li", "o li via", "ô liu"],
+    "Shaelyn": ["shaelyn", "sê lin", "se lin", "sa lin", "sơ lin", "sa e lin", "sa-lin", "se-lin", "xe lin", "shaelynn", "sê-lin", "sơ-lin"],
+    "Aroha": ["aroha", "aloha", "a rô ha", "a ro ha", "ro ha", "a lô ha", "a-ro-ha", "a lo ha", "lo ha", "rô ha"],
+    "Viet": ["viet", "việt", "anh việt", "chú việt"],
+    "Jude": ["jude", "dút", "dút đơ", "giu đê", "giu đe", "dút-đơ", "giu-đê"],
 }
 
-ASSISTANT_VOCATIVES = {"joy", "troy", "chơi", "choi", "chơi ơi", "joy ơi", "troy ơi", "em ơi", "troi", "ok chơi ơi", "ok joy", "ok troy"}
+ASSISTANT_VOCATIVES = {
+    "joy", "troy", "chơi", "choi", "chơi ơi", "joy ơi", "troy ơi", "em ơi", "troi",
+    "ok chơi ơi", "ok joy", "ok troy", "hai chọi", "chọi", "chọi ơi", "hai chơi",
+    "hai joy", "hai troy", "alo joy", "chòi", "ê joy"
+}
 NON_NAME_STOP_WORDS = {
     "ngày", "thứ", "chơi", "thêm", "được", "không", "giúp", "muốn", "người", "trời",
     "hãy", "sang", "rời", "dời", "cho", "ca", "giờ", "làm", "nghen", "nhen", "nghe",
     "nè", "nhe", "nha", "nó", "nào", "nghỉ", "đổi", "sửa", "xếp", "nên", "vào", "qua",
     "ai", "bạn", "chị", "em", "nữa", "thế", "của", "từ", "tới", "đến", "có", "thể",
-    "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "sáng", "trưa", "chiều", "tối"
+    "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "sáng", "trưa", "chiều", "tối",
+    "đi", "nhé", "giùm", "hộ", "với", "khỏi", "off"
 }
 
 
@@ -941,7 +946,10 @@ def parse_intent_rule_based(
     history: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[Optional[str], Dict[str, Any]]:
     """Fast, deterministic fallback parser with conversational context memory and database knowledge."""
+    # Pre-normalize common speech recognition errors (e.g. "nghĩ" -> "nghỉ")
     msg = user_message.lower().strip()
+    msg = re.sub(r"\bnghĩ\b", "nghỉ", msg)
+    msg = re.sub(r"\bnghi\b", "nghỉ", msg)
     all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows] if roster_rows else []
 
     days = find_days_in_text(msg)
@@ -1000,7 +1008,7 @@ def parse_intent_rule_based(
         "bán hàng", "service staff", "chức vụ", "làm chức vụ", "làm vị trí gì", "vị trí gì",
         "ai là thợ", "ai phụ bánh", "ai làm bánh", "ai bán hàng"
     ]
-    if any(k in msg for k in role_keywords) and not any(k in msg for k in ["đổi", "dời", "chuyển", "thêm ca", "xóa ca", "cho nghỉ"]):
+    if any(k in msg for k in role_keywords) and not any(k in msg for k in ["đổi", "dời", "chuyển", "thêm ca", "xóa ca", "cho nghỉ", "nghỉ"]):
         target_emp = found_emps[0] if found_emps else ""
         return "query_employee_role", {"emp": target_emp, "query_type": msg}
 
@@ -1012,7 +1020,7 @@ def parse_intent_rule_based(
         "có làm được không", "có đi làm được không", "có rảnh không", "có bận không",
         "có available không", "unavailable", "available", "lịch bận", "vướng lịch", "vướng"
     ]
-    if any(k in msg for k in restriction_keywords) and not any(k in msg for k in ["cho nghỉ", "xóa ca", "bỏ ca", "thêm ca", "1k"]):
+    if any(k in msg for k in restriction_keywords) and not any(k in msg for k in ["cho nghỉ", "xóa ca", "bỏ ca", "thêm ca", "1k", "cho off"]):
         target_emp = found_emps[0] if found_emps else ""
         return "query_unavailability_restriction", {"emp": target_emp, "day": day or "", "query_type": msg}
 
@@ -1035,7 +1043,7 @@ def parse_intent_rule_based(
         "ít giờ nhất", "bao nhiêu ca", "mấy ca", "lịch làm của", "lịch làm việc của",
         "tuần này làm", "hôm nay ai làm"
     ]
-    if any(k in msg for k in schedule_keywords) and not any(k in msg for k in ["đổi", "dời", "chuyển", "thêm", "xóa", "cho nghỉ"]):
+    if any(k in msg for k in schedule_keywords) and not any(k in msg for k in ["đổi", "dời", "chuyển", "thêm", "xóa", "cho nghỉ", "nghỉ", "off"]):
         target_emp = found_emps[0] if found_emps else ""
         return "query_shift_schedule_and_hours", {"emp": target_emp, "day": day or "", "query_type": msg}
 
@@ -1079,9 +1087,14 @@ def parse_intent_rule_based(
     # Case C: One employee mentioned
     if len(found_emps) == 1:
         emp = found_emps[0]
-        # 1. Remove shift / day off
-        if any(k in msg for k in ["nghỉ", "off", "bỏ ca", "xóa ca", "cho nghỉ", "bỏ", "xóa"]):
-            return "remove_shift", {"emp": emp, "day": day or prev_day or "Saturday"}
+        # 1. Remove shift / day off (Broad natural patterns: "cho nghỉ", "off", "không làm", "khỏi làm", "nghĩ", "hủy ca")
+        day_off_triggers = [
+            "nghỉ", "off", "bỏ ca", "xóa ca", "cho nghỉ", "cho off", "bỏ", "xóa",
+            "hủy ca", "hủy", "không làm", "hông làm", "ko làm", "không đi làm",
+            "nghỉ làm", "khỏi làm", "khỏi xếp", "không xếp"
+        ]
+        if any(k in msg for k in day_off_triggers):
+            return "remove_shift", {"emp": emp, "day": day or prev_day or "Monday"}
 
         # 2. Adjust hours / Add shift with time (full range)
         if time_str:
@@ -1098,11 +1111,12 @@ def parse_intent_rule_based(
         if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "chỉnh", "sửa", "đổi", "thay đổi", "xem ca", "ca", "thêm", "thêm ca", "1k", "1 k", "làm ca", "làm", "xếp", "xếp ca", "giờ"]):
             return "query_or_prompt_shift", {"emp": emp, "day": day or prev_day or "Monday"}
 
-    # Case D: Greeting or mic check (ONLY when no employee was mentioned)
-    if not found_emps:
+    # Case D: Greeting or mic check (ONLY when strictly greeting words with no task instructions)
+    if not found_emps and not days:
         greeting_patterns = [
-            r"\bhello\b", r"\bhi\b", r"\bchào\b", r"\bjoy ơi\b", r"\bem ơi\b", r"\balo\b",
-            r"\bhi joy\b", r"\btroy\b", r"không nói gì", r"sao không nói", r"sao nó không nói", r"im re"
+            r"^\s*hello\b", r"^\s*hi\b", r"^\s*chào\b", r"^\s*joy ơi\b", r"^\s*em ơi\b", r"^\s*alo\b",
+            r"^\s*hi joy\b", r"^\s*troy\b", r"^\s*hai chọi\b", r"^\s*hai joy\b", r"^\s*chọi ơi\b",
+            r"không nói gì", r"sao không nói", r"sao nó không nói", r"im re"
         ]
         if any(re.search(p, msg) for p in greeting_patterns):
             return "greeting", {"raw": user_message}
@@ -1405,13 +1419,25 @@ QUY TẮC ĐÃ HỌC:
         except Exception as e:
             print(f"[Joy Assistant] Gemini API error: {e}")
 
-    # Fallback default response
+    # Intelligent, transparent clarification response
     if not final_reply:
-        last_joy_msg = next((h.get("message_text", "") for h in reversed(history) if h.get("speaker") == "Joy"), "")
-        if not last_joy_msg or len(history) <= 1:
-            final_reply = "Dạ Joy nghe nè chị Nhi! Chị dặn Joy sửa ca bạn nào nghen!"
+        found_emps = find_employees_in_text(user_message, all_emp)
+        days = find_days_in_text(user_message)
+        day_vi = DAYS_VI_NAMES.get(days[0], days[0]) if days else ""
+        clean_user = user_message.strip()
+
+        if found_emps and days:
+            emp = found_emps[0]
+            final_reply = f"Dạ chị Nhi ơi, Joy nghe chị nhắc tới bạn {emp} vào {day_vi} rồi nè, mà Joy chưa rõ chị muốn làm gì á (cho {emp} nghỉ ca, đổi ca, hay sửa mấy giờ)? Chị nói rõ lại xíu Joy làm liền nghen! 🥖"
+        elif found_emps:
+            emp = found_emps[0]
+            final_reply = f"Dạ chị Nhi ơi, Joy nghe chị nhắc tới bạn {emp} rồi nè, mà Joy chưa rõ chị muốn làm gì á (cho {emp} nghỉ ca, đổi ca, hay hỏi thông tin gì của bạn)? Chị dặn rõ lại xíu Joy làm liền nghen! 🥖"
+        elif days:
+            final_reply = f"Dạ chị Nhi ơi, Joy nghe chị nhắc tới ngày {day_vi} rồi nè, mà chưa rõ chị muốn chỉnh ca của bạn nào á? Chị dặn Joy tên bạn với nghen! 🥖"
+        elif len(clean_user) >= 2:
+            final_reply = "Dạ chị Nhi ơi, câu này Joy chưa hiểu rõ ý chị muốn làm gì á! Chị nói lại giúp Joy với nghen (ví dụ: 'Cho Jane nghỉ thứ Hai', 'Đổi ca của Robert qua cho Viet', hay 'Số điện thoại của Ainsley') để Joy làm cho chuẩn nè! 🥖✨"
         else:
-            final_reply = "Dạ, Joy nghe nè chị."
+            final_reply = "Dạ Joy nghe nè chị Nhi! Chị dặn Joy làm gì nghen!"
 
     # Save to chat history
     if db:
