@@ -87,10 +87,13 @@ PHONETIC_ALIASES = {
         "ai-mi", "ai-mì", "ai-my", "e mi", "ê mi", "e mì", "ê mì",
         "a mi", "a mì", "aimy", "em mi", "em mì", "mai mày", "mai may"
     ],
-    "Ainsley Mactier": ["ainsley", "mactier", "en xli", "en xly", "mắc ti er", "mác ti ơ", "en-xli", "mắc ti e", "ainsley mactier"],
+    "Ainsley Mactier": [
+        "ainsley", "mactier", "en xli", "en xly", "mắc ti er", "mác ti ơ", "en-xli",
+        "mắc ti e", "ainsley mactier", "en-xi-li", "en xi li", "en-xờ-li"
+    ],
     "Stella": ["stella", "sờ te la", "te la", "tét la", "ste la", "ten la"],
     "Amy": ["amy", "e mi", "ê mi", "ay mi"],
-    "Jack": ["jack", "dách", "dzắc", "giắc", "dắt", "zắc", "giắt"],
+    "Jack": ["jack", "dách", "dắc", "giắc", "dắt", "zắc", "giắt"],
     "Olivia": ["olivia", "ô li via", "li via", "ô li", "ô-li", "o li via"],
     "Shaelyn": ["shaelyn", "sê lin", "se lin", "sa lin", "sơ lin", "sa e lin", "sa-lin", "se-lin", "xe lin", "shaelynn"],
     "Aroha": ["aroha", "aloha", "a rô ha", "a ro ha", "ro ha", "a lô ha", "a-ro-ha", "a lo ha", "lo ha"],
@@ -198,11 +201,9 @@ def match_employee_name(name_query: str, available_names: List[str]) -> Optional
     matches = find_employees_in_text(q, available_names)
     if matches:
         return matches[0]
-    # 1. Exact match
     for name in available_names:
         if name.lower() == q:
             return name
-    # 2. Substring match
     for name in available_names:
         if q in name.lower() or name.lower() in q:
             return name
@@ -230,6 +231,41 @@ def format_shift_time_vi(shift_str: str) -> str:
         t2 = f"{h2_disp}h{m2 if m2 != '00' else ''} {p2}"
         return f"từ {t1} tới {t2}"
     return s
+
+
+def parse_shift_duration_hours(shift_str: str) -> float:
+    s = str(shift_str or "").strip()
+    if not s or s.lower() in ["off", "-", "nan", "none"]:
+        return 0.0
+    m = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[-–]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", s, re.IGNORECASE)
+    if not m:
+        return 0.0
+    h1 = int(m.group(1))
+    m1 = int(m.group(2) or 0)
+    p1 = (m.group(3) or "").lower()
+    h2 = int(m.group(4))
+    m2 = int(m.group(5) or 0)
+    p2 = (m.group(6) or "").lower()
+
+    if p1 == "pm" and h1 < 12:
+        h1 += 12
+    if p1 == "am" and h1 == 12:
+        h1 = 0
+    if p2 == "pm" and h2 < 12:
+        h2 += 12
+    if p2 == "am" and h2 == 12:
+        h2 = 0
+
+    if not p1 and not p2:
+        if h2 < h1 and h2 < 12:
+            h2 += 12
+    elif not p1 and p2 == "pm":
+        if h1 < 12 and h1 > (h2 - 12):
+            h1 += 12
+
+    t1 = h1 + m1 / 60.0
+    t2 = h2 + m2 / 60.0
+    return max(0.0, round(t2 - t1, 2))
 
 
 def parse_time_range(text: str) -> Optional[str]:
@@ -268,13 +304,6 @@ def parse_time_range(text: str) -> Optional[str]:
 
 
 def parse_start_end_time_adjustment(msg: str, current_shift: str) -> Optional[str]:
-    """
-    Parses single start-time or end-time adjustments e.g.:
-    'Chỉnh giờ bắt đầu của Aloha vào ngày thứ tư từ 6 giờ thành 7 giờ'
-    'Chỉnh giờ bắt đầu vào ngày thứ tư của Aloha thành 7 giờ'
-    'đổi giờ vào thành 7h'
-    'cho về lúc 2h chiều'
-    """
     low = msg.lower()
     norm = re.sub(r"(\d{1,2})\s*giờ", r"\1h", low)
     m_from_to = re.search(r"từ\s*(\d{1,2})h?\s*thành\s*(\d{1,2})h?", norm)
@@ -318,6 +347,359 @@ def parse_start_end_time_adjustment(msg: str, current_shift: str) -> Optional[st
     return f"{target_h:02d}:{target_m} - {target_h+5:02d}:{target_m}"
 
 
+# =========================================================================
+# OMNISCIENT DATABASE QUERY HANDLERS (FULL APP DATABASE KNOWLEDGE)
+# =========================================================================
+
+def load_all_employee_directory(db_instance: Any) -> Dict[str, Dict[str, Any]]:
+    """Loads all employee records, combining datasets/employees and system_store/user_profiles."""
+    if not db_instance:
+        return {}
+    employees = db_instance.load_records("employees") or []
+    user_profiles = db_instance.load_system_doc("user_profiles") or {}
+
+    directory = {}
+    for e in employees:
+        name = (e.get("NAME") or e.get("Name") or e.get("Employee") or "").strip()
+        if not name:
+            continue
+        up = None
+        for k, v in user_profiles.items():
+            emp_n = v.get("employee_name", "").strip()
+            if emp_n.lower() == name.lower() or k.lower() == name.lower() or name.lower().startswith(k.lower()):
+                up = v
+                break
+        prof = up.get("profile", {}) if up else {}
+
+        directory[name.lower()] = {
+            "name": name,
+            "full_name": prof.get("full_name") or name,
+            "position": e.get("position") or prof.get("employment_level") or "Service Staff",
+            "team": e.get("Team") or "Service Staff",
+            "status": e.get("status") or prof.get("classification") or "casual",
+            "dob": prof.get("dob") or e.get("DOB") or "",
+            "commencement_date": prof.get("commencement_date") or e.get("Commencing Date") or "",
+            "mobile": prof.get("mobile") or "",
+            "home_phone": prof.get("home_phone") or "",
+            "email": prof.get("email") or "",
+            "address": prof.get("address") or "",
+            "emergency_contact": prof.get("emergency_contact") or prof.get("super_contact") or "",
+        }
+
+    for k, v in user_profiles.items():
+        emp_n = (v.get("employee_name") or k).strip()
+        if emp_n.lower() not in directory and emp_n.lower() != "admin":
+            prof = v.get("profile", {})
+            directory[emp_n.lower()] = {
+                "name": emp_n,
+                "full_name": prof.get("full_name") or emp_n,
+                "position": prof.get("employment_level") or v.get("role") or "Service Staff",
+                "team": "Service Staff",
+                "status": prof.get("classification") or "casual",
+                "dob": prof.get("dob") or "",
+                "commencement_date": prof.get("commencement_date") or "",
+                "mobile": prof.get("mobile") or "",
+                "home_phone": prof.get("home_phone") or "",
+                "email": prof.get("email") or "",
+                "address": prof.get("address") or "",
+                "emergency_contact": prof.get("emergency_contact") or "",
+            }
+
+    return directory
+
+
+def query_contact_info(emp_name: str, query_type: str, db_instance: Any) -> str:
+    """Answers contact details: phone, email, address, DOB, commencement date from database."""
+    directory = load_all_employee_directory(db_instance)
+    emp_key = emp_name.lower().strip()
+
+    matched_info = None
+    for k, v in directory.items():
+        if k == emp_key or emp_key in k or k in emp_key:
+            matched_info = v
+            break
+
+    if not matched_info:
+        return f"Chị Nhi ơi, Joy hổng tìm thấy hồ sơ của bạn '{emp_name}' trong dữ liệu tiệm mình nè!"
+
+    name = matched_info["name"]
+    mobile = matched_info["mobile"]
+    home_phone = matched_info["home_phone"]
+    email = matched_info["email"]
+    addr = matched_info["address"]
+    dob = matched_info["dob"]
+    start = matched_info["commencement_date"]
+    pos = matched_info["position"]
+
+    # Phone number query
+    if any(k in query_type.lower() for k in ["phone", "mobile", "sđt", "số điện thoại", "alo", "gọi", "điện thoại"]):
+        if mobile and home_phone and mobile != home_phone:
+            return f"Dạ số điện thoại của {name} là {mobile} (hoặc số nhà {home_phone}) nghen chị Nhi! 🥖"
+        elif mobile:
+            return f"Dạ số điện thoại của {name} là {mobile} nghen chị Nhi! 🥖"
+        elif home_phone:
+            return f"Dạ {name} có số liên hệ là {home_phone} nghen chị Nhi!"
+        else:
+            return f"Dạ chị Nhi ơi, trên hệ thống bạn {name} chưa có điền số điện thoại á!"
+
+    # Email query
+    if any(k in query_type.lower() for k in ["email", "thư", "mail"]):
+        if email:
+            return f"Dạ email của {name} là {email} nghen chị Nhi! ✉️"
+        else:
+            return f"Dạ chị Nhi ơi, trên app chưa có cập nhật địa chỉ email của bạn {name} nè!"
+
+    # Address query
+    if any(k in query_type.lower() for k in ["address", "địa chỉ", "ở đâu", "nhà"]):
+        if addr:
+            return f"Dạ địa chỉ nhà của {name} là: {addr} nghen chị Nhi! 🏡"
+        else:
+            return f"Dạ chị Nhi ơi, trong hồ sơ bạn {name} chưa có lưu địa chỉ nhà á!"
+
+    # Birthday / DOB
+    if any(k in query_type.lower() for k in ["dob", "sinh", "sinh nhật", "tuổi", "năm sinh"]):
+        if dob:
+            return f"Dạ ngày sinh của {name} là {dob} nghen chị Nhi! 🎂"
+        else:
+            return f"Dạ trong hồ sơ chưa có ngày sinh của bạn {name} nè chị!"
+
+    # Commencement date
+    if any(k in query_type.lower() for k in ["commence", "bắt đầu", "vào làm", "ngày vào"]):
+        if start:
+            return f"Dạ bạn {name} bắt đầu vào làm tại tiệm từ ngày {start} nghen chị! 🥖"
+        else:
+            return f"Dạ trong hệ thống chưa ghi nhận ngày vào làm của {name} nè chị!"
+
+    # Full profile summary
+    details = []
+    if mobile:
+        details.append(f"SĐT: {mobile}")
+    if email:
+        details.append(f"Email: {email}")
+    if dob:
+        details.append(f"Ngày sinh: {dob}")
+    if pos:
+        details.append(f"Vị trí: {pos}")
+    if start:
+        details.append(f"Vào làm: {start}")
+    if addr:
+        details.append(f"Địa chỉ: {addr}")
+
+    if details:
+        return f"Dạ thông tin của {name} nè chị Nhi: {', '.join(details)} nghen! 🌟"
+    else:
+        return f"Dạ hồ sơ của {name} hiện tại chỉ có tên trên danh sách tiệm thôi chứ chưa điền chi tiết liên hệ á chị!"
+
+
+def query_employee_role(query_type: str, emp_name: str, db_instance: Any) -> str:
+    """Answers positions, roles, baker vs service staff status from database."""
+    directory = load_all_employee_directory(db_instance)
+    low = query_type.lower()
+
+    if emp_name:
+        emp_key = emp_name.lower().strip()
+        matched = None
+        for k, v in directory.items():
+            if k == emp_key or emp_key in k or k in emp_key:
+                matched = v
+                break
+        if not matched:
+            return f"Chị Nhi ơi, Joy hổng tìm thấy hồ sơ của bạn '{emp_name}' trong tiệm á!"
+        name = matched["name"]
+        pos = matched["position"]
+        team = matched["team"]
+        status = matched["status"]
+        return f"Dạ bạn {name} giữ vị trí {pos} ({team}, hình thức {status}) nghen chị Nhi! 🥖"
+
+    if any(k in low for k in ["thợ bánh", "thợ làm bánh", "baker"]) and "phụ" not in low:
+        bakers = [
+            v["name"]
+            for v in directory.values()
+            if "baker" in v["position"].lower() and "assitant" not in v["position"].lower() and "assistant" not in v["position"].lower()
+        ]
+        assts = [v["name"] for v in directory.values() if "assitant" in v["position"].lower() or "assistant" in v["position"].lower()]
+        b_str = ", anh ".join(bakers)
+        a_str = ", ".join(assts)
+        return f"Dạ tiệm mình có anh {b_str} là thợ làm bánh chính, còn bạn {a_str} là thợ phụ bánh nè chị Nhi! 🥐"
+
+    if any(k in low for k in ["phụ bánh", "baker assistant", "baker assitant"]):
+        assts = [v["name"] for v in directory.values() if "assitant" in v["position"].lower() or "assistant" in v["position"].lower()]
+        return f"Dạ ở tiệm mình người làm phụ tá thợ bánh là bạn {', '.join(assts)} nghen chị Nhi! 🥐"
+
+    if any(k in low for k in ["bán hàng", "service staff", "service"]):
+        service = [v["name"] for v in directory.values() if "service" in v["position"].lower()]
+        return f"Dạ nhóm nhân viên bán hàng (Service Staff) gồm có: {', '.join(service)} nghen chị Nhi! 🌟"
+
+    return "Dạ chị muốn hỏi về vị trí của bạn nào hay chức danh nào trong tiệm dặn Joy nghen!"
+
+
+def query_unavailability_restrictions(emp_name: Optional[str], day: Optional[str], db_instance: Any) -> str:
+    """Queries employee unavailability and restrictions from database."""
+    if not db_instance:
+        return "Dạ Joy chưa truy cập được dữ liệu ngày nghỉ á chị!"
+    unav_list = db_instance.load_records("unavailability") or []
+
+    day_vi = DAYS_VI_NAMES.get(day, day) if day else ""
+
+    # Specific employee + Specific day
+    if emp_name and day:
+        emp_key = emp_name.lower().strip()
+        matched_records = [u for u in unav_list if u.get("Employee", "").lower() == emp_key and u.get("Day") == day]
+        if matched_records:
+            windows = []
+            for r in matched_records:
+                w = r.get("Time Window", "")
+                w_disp = re.sub(r"\(From [^)]+\)", "", w).strip()
+                windows.append(w_disp)
+            win_str = ", ".join(set(windows))
+            return f"Dạ {day_vi} này {emp_name} có restriction/bận khung giờ: {win_str} nghen chị Nhi!"
+        else:
+            return f"Dạ {day_vi} này {emp_name} hoàn toàn rảnh, không có restriction nào hết, chị xếp ca thoải mái nghen! ✨"
+
+    # Specific employee, overall restrictions
+    if emp_name and not day:
+        emp_key = emp_name.lower().strip()
+        matched_records = [u for u in unav_list if u.get("Employee", "").lower() == emp_key]
+        if not matched_records:
+            return f"Dạ bạn {emp_name} không có đăng ký restriction nào hết á chị Nhi, bạn hoàn toàn available nghen! ✨"
+
+        by_day = {}
+        for r in matched_records:
+            d = r.get("Day", "")
+            d_vi = DAYS_VI_NAMES.get(d, d)
+            w = r.get("Time Window", "")
+            w_disp = re.sub(r"\(From [^)]+\)", "", w).strip()
+            by_day.setdefault(d_vi, set()).add(w_disp)
+
+        parts = [f"{d}: {', '.join(wins)}" for d, wins in by_day.items()]
+        if len(parts) > 4:
+            parts_str = "; ".join(parts[:4]) + f" (và {len(parts)-4} ngày khác)"
+        else:
+            parts_str = "; ".join(parts)
+        return f"Dạ lịch bận (restriction) của {emp_name} gồm có: {parts_str} nghen chị Nhi!"
+
+    # Query who is unavailable on a specific day
+    if day and not emp_name:
+        matched_records = [u for u in unav_list if u.get("Day") == day]
+        if not matched_records:
+            return f"Dạ {day_vi} này tiệm mình không có bạn nào đăng ký bận hết, tất cả đều available nghen chị! 🥖"
+
+        emp_map = {}
+        for r in matched_records:
+            e = r.get("Employee")
+            w = r.get("Time Window", "")
+            w_disp = re.sub(r"\(From [^)]+\)", "", w).strip()
+            emp_map.setdefault(e, set()).add(w_disp)
+
+        desc = [f"{e} ({', '.join(wins)})" for e, wins in emp_map.items()]
+        return f"Dạ {day_vi} này có các bạn sau có restriction/bận nè chị: {', '.join(desc)} nghen!"
+
+    return "Dạ chị muốn xem lịch bận của bạn nào hoặc thứ mấy dặn Joy coi liền nghen!"
+
+
+def query_roster_schedule_and_hours(
+    emp_name: Optional[str],
+    day: Optional[str],
+    query_type: str,
+    roster_rows: List[Dict[str, Any]],
+) -> str:
+    """Answers shift queries: who is working on a day, employee weekly hours, top hours ranking."""
+    if not roster_rows:
+        return "Dạ hiện tại Joy chưa thấy có bảng Roster nào đang mở hết á chị Nhi!"
+
+    all_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    # Who is working on a specific day?
+    if day and any(k in query_type.lower() for k in ["ai làm", "ai đi làm", "những ai", "ai có ca", "mấy người", "danh sách"]):
+        day_vi = DAYS_VI_NAMES.get(day, day)
+        working_staff = []
+        for r in roster_rows:
+            emp = r.get("Employee") or r.get("NAME") or ""
+            shift = str(r.get(day) or "").strip()
+            if shift and shift.lower() not in ["off", "-", "nan", "none"]:
+                working_staff.append(f"{emp} ({shift})")
+        if working_staff:
+            return f"Dạ {day_vi} này tiệm mình có {len(working_staff)} bạn đi làm nè chị Nhi: {', '.join(working_staff)} nghen! 🥖"
+        else:
+            return f"Dạ {day_vi} này chưa có bạn nào được xếp ca làm hết á chị!"
+
+    # Ranking who works the most hours / least hours
+    if any(k in query_type.lower() for k in ["nhiều giờ nhất", "nhiều nhất", "top giờ", "ít giờ nhất", "ít nhất", "tổng kết giờ"]):
+        hours_by_emp = []
+        for r in roster_rows:
+            emp = r.get("Employee") or r.get("NAME") or ""
+            total_h = sum(parse_shift_duration_hours(str(r.get(d) or "")) for d in all_days)
+            shifts_cnt = sum(
+                1
+                for d in all_days
+                if str(r.get(d) or "").strip() and str(r.get(d) or "").strip().lower() not in ["off", "-", "nan", "none"]
+            )
+            hours_by_emp.append((emp, total_h, shifts_cnt))
+
+        hours_by_emp.sort(key=lambda x: x[1], reverse=True)
+
+        if "ít" in query_type.lower():
+            hours_by_emp.sort(key=lambda x: x[1])
+            top_few = [f"{e}: {h}h ({c} ca)" for e, h, c in hours_by_emp[:4] if h > 0]
+            return f"Dạ tuần này những bạn làm ít giờ nhất là: {', '.join(top_few)} nghen chị Nhi!"
+        else:
+            top_few = [f"{e}: {h}h ({c} ca)" for e, h, c in hours_by_emp[:4]]
+            return f"Dạ tuần này bạn làm nhiều giờ nhất là {hours_by_emp[0][0]} với {hours_by_emp[0][1]} tiếng. Tiếp theo là {', '.join(top_few[1:])} nghen chị Nhi! 🌟"
+
+    # Specific employee working hours & schedule
+    if emp_name:
+        row = next((r for r in roster_rows if str(r.get("Employee") or r.get("NAME") or "").lower() == emp_name.lower()), None)
+        if not row:
+            return f"Chị Nhi ơi, Joy hổng tìm thấy bạn '{emp_name}' trên bảng lịch tuần này á!"
+
+        emp_real = row.get("Employee") or row.get("NAME") or emp_name
+        shifts = []
+        total_h = 0.0
+        for d in all_days:
+            s = str(row.get(d) or "").strip()
+            if s and s.lower() not in ["off", "-", "nan", "none"]:
+                d_vi = DAYS_VI_NAMES.get(d, d)
+                dur = parse_shift_duration_hours(s)
+                total_h += dur
+                shifts.append(f"{d_vi} ({s})")
+
+        if shifts:
+            return f"Dạ tuần này {emp_real} làm {len(shifts)} ca, tổng cộng {total_h} tiếng ({', '.join(shifts)}) nghen chị Nhi! 🥖"
+        else:
+            return f"Dạ tuần này bạn {emp_real} không có ca nào trên lịch hết, đang nghỉ trọn tuần nghen chị!"
+
+    return "Dạ chị muốn coi giờ làm của bạn nào hay ngày thứ mấy nghen?"
+
+
+def query_holidays_info(query_type: str, db_instance: Any) -> str:
+    """Answers upcoming public holidays and Victorian school holidays."""
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    h_doc = db_instance.load_system_doc("holiday_calendar") if db_instance else {}
+    cal = h_doc.get("calendar", {}) if h_doc else {}
+    pub = cal.get("public", [])
+    school = cal.get("school", [])
+
+    upcoming_pub = [p for p in pub if p.get("start", "") >= today_str][:3]
+    upcoming_sch = [s for s in school if s.get("end", "") >= today_str][:2]
+
+    lines = []
+    if upcoming_sch:
+        for s in upcoming_sch:
+            lines.append(f"- Kỳ nghỉ học sinh {s.get('name')}: từ {s.get('start')} tới {s.get('end')}")
+    if upcoming_pub:
+        for p in upcoming_pub:
+            lines.append(f"- Ngày lễ {p.get('name')}: ngày {p.get('start')}")
+
+    if lines:
+        return "Dạ sắp tới tiểu bang Victoria mình có các kỳ nghỉ và ngày lễ nè chị Nhi:\n" + "\n".join(lines) + "\nChị lưu ý sắp xếp thợ bánh với nhân viên bán hàng những ngày này nghen! 🥖✨"
+    else:
+        return "Dạ trong thời gian tới không có kỳ nghỉ lễ lớn nào ở Victoria hết nghen chị!"
+
+
+# =========================================================================
+# ACTION EXECUTION ENGINE
+# =========================================================================
+
 def execute_roster_action(
     action_type: str,
     params: Dict[str, Any],
@@ -325,20 +707,54 @@ def execute_roster_action(
     db: Any = None,
 ) -> Tuple[bool, str, List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Executes a structured action on roster_rows and returns:
+    Executes a structured action on roster_rows or queries app databases:
     (success, phan_rang_reply, updated_roster_rows, action_summary)
     """
-    if not roster_rows:
-        return False, "Ủa chị Nhi ơi, hiện tại Joy chưa thấy có bảng Roster nào để chỉnh hết á!", roster_rows, {}
-
-    all_emp_names = [str(r.get("Employee") or r.get("NAME") or r.get("Name") or "").strip() for r in roster_rows]
+    all_emp_names = [str(r.get("Employee") or r.get("NAME") or r.get("Name") or "").strip() for r in roster_rows] if roster_rows else []
     day = params.get("day")
     if day:
         day = normalize_day(day) or day
-    if day not in DAYS_VI_NAMES:
+    if day and day not in DAYS_VI_NAMES:
         day = "Monday"
 
-    day_vi = DAYS_VI_NAMES.get(day, day)
+    day_vi = DAYS_VI_NAMES.get(day, day) if day else ""
+
+    # --- 1. Omnichannel Database Query Handlers ---
+    if action_type == "query_employee_contact":
+        emp_raw = params.get("emp", "")
+        emp = match_employee_name(emp_raw, all_emp_names) or emp_raw
+        q_type = params.get("query_type", "contact")
+        reply = query_contact_info(emp, q_type, db)
+        return True, reply, roster_rows, {"action": "query_employee_contact", "emp": emp}
+
+    elif action_type == "query_employee_role":
+        emp_raw = params.get("emp", "")
+        emp = match_employee_name(emp_raw, all_emp_names) if emp_raw else ""
+        q_type = params.get("query_type", "")
+        reply = query_employee_role(q_type, emp, db)
+        return True, reply, roster_rows, {"action": "query_employee_role", "emp": emp}
+
+    elif action_type == "query_unavailability_restriction":
+        emp_raw = params.get("emp", "")
+        emp = match_employee_name(emp_raw, all_emp_names) if emp_raw else ""
+        reply = query_unavailability_restrictions(emp, day, db)
+        return True, reply, roster_rows, {"action": "query_unavailability_restriction", "emp": emp, "day": day}
+
+    elif action_type == "query_shift_schedule_and_hours":
+        emp_raw = params.get("emp", "")
+        emp = match_employee_name(emp_raw, all_emp_names) if emp_raw else ""
+        q_type = params.get("query_type", "")
+        reply = query_roster_schedule_and_hours(emp, day, q_type, roster_rows)
+        return True, reply, roster_rows, {"action": "query_shift_schedule_and_hours", "emp": emp, "day": day}
+
+    elif action_type == "query_holidays":
+        q_type = params.get("query_type", "")
+        reply = query_holidays_info(q_type, db)
+        return True, reply, roster_rows, {"action": "query_holidays"}
+
+    # --- 2. Roster Modification Actions (Require roster_rows) ---
+    if not roster_rows:
+        return False, "Ủa chị Nhi ơi, hiện tại Joy chưa thấy có bảng Roster nào để chỉnh hết á!", roster_rows, {}
 
     if action_type == "move_shift_day":
         emp_raw = params.get("emp", "")
@@ -515,14 +931,18 @@ def execute_roster_action(
     return False, "Dạ, Joy nghe nè chị.", roster_rows, {}
 
 
+# =========================================================================
+# DETERMINISTIC INTENT PARSER
+# =========================================================================
+
 def parse_intent_rule_based(
     user_message: str,
     roster_rows: List[Dict[str, Any]],
     history: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[Optional[str], Dict[str, Any]]:
-    """Fast, deterministic fallback parser with conversational context memory."""
+    """Fast, deterministic fallback parser with conversational context memory and database knowledge."""
     msg = user_message.lower().strip()
-    all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows]
+    all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows] if roster_rows else []
 
     days = find_days_in_text(msg)
     day = days[0] if days else None
@@ -558,7 +978,72 @@ def parse_intent_rule_based(
             if matches and matches[0].lower() != found_emps[0].lower():
                 found_emps.append(matches[0])
 
-    # Priority: Preference instruction (e.g. "Dặn Joy nhớ...", "Sau này đừng xếp...", "Từ nay ưu tiên...")
+    # ---------------------------------------------------------------------
+    # QUERY INTENT 1: Contact info (Phone, Email, Address, DOB, Commencement)
+    # ---------------------------------------------------------------------
+    contact_keywords = [
+        "số điện thoại", "sđt", "so dien thoai", "sdt", "số phone", "phone", "mobile",
+        "điện thoại", "alo", "gọi", "email", "mail", "thư điện tử", "địa chỉ", "dia chi",
+        "ở đâu", "nhà ở", "nhà của", "sinh nhật", "ngày sinh", "sinh năm", "năm sinh",
+        "sinh ngày", "ngày vào làm", "bắt đầu làm", "vào làm từ", "vào tiệm", "thông tin cá nhân",
+        "thông tin của", "profile của", "hồ sơ của", "profile"
+    ]
+    if any(k in msg for k in contact_keywords):
+        target_emp = found_emps[0] if found_emps else (prev_emp or "")
+        return "query_employee_contact", {"emp": target_emp, "query_type": msg}
+
+    # ---------------------------------------------------------------------
+    # QUERY INTENT 2: Employee roles & positions (Baker, Baker Assistant, Service Staff)
+    # ---------------------------------------------------------------------
+    role_keywords = [
+        "thợ bánh", "thợ làm bánh", "baker", "phụ bánh", "baker assistant", "baker assitant",
+        "bán hàng", "service staff", "chức vụ", "làm chức vụ", "làm vị trí gì", "vị trí gì",
+        "ai là thợ", "ai phụ bánh", "ai làm bánh", "ai bán hàng"
+    ]
+    if any(k in msg for k in role_keywords) and not any(k in msg for k in ["đổi", "dời", "chuyển", "thêm ca", "xóa ca", "cho nghỉ"]):
+        target_emp = found_emps[0] if found_emps else ""
+        return "query_employee_role", {"emp": target_emp, "query_type": msg}
+
+    # ---------------------------------------------------------------------
+    # QUERY INTENT 3: Unavailability & Restrictions
+    # ---------------------------------------------------------------------
+    restriction_keywords = [
+        "restriction", "unavailability", "bận", "rảnh", "nghỉ phép", "xin nghỉ",
+        "có làm được không", "có đi làm được không", "có rảnh không", "có bận không",
+        "có available không", "unavailable", "available", "lịch bận", "vướng lịch", "vướng"
+    ]
+    if any(k in msg for k in restriction_keywords) and not any(k in msg for k in ["cho nghỉ", "xóa ca", "bỏ ca", "thêm ca", "1k"]):
+        target_emp = found_emps[0] if found_emps else ""
+        return "query_unavailability_restriction", {"emp": target_emp, "day": day or "", "query_type": msg}
+
+    # ---------------------------------------------------------------------
+    # QUERY INTENT 4: Holidays (Public holidays, School holidays)
+    # ---------------------------------------------------------------------
+    holiday_keywords = [
+        "ngày lễ", "nghỉ lễ", "public holiday", "school holiday", "lễ sắp tới",
+        "nghỉ hè", "nghỉ thu", "lễ tết", "giáng sinh", "christmas", "boxing day", "tết tây"
+    ]
+    if any(k in msg for k in holiday_keywords):
+        return "query_holidays", {"query_type": msg}
+
+    # ---------------------------------------------------------------------
+    # QUERY INTENT 5: Shift schedule, total hours, who is working, rankings
+    # ---------------------------------------------------------------------
+    schedule_keywords = [
+        "ai đi làm", "ai làm", "những ai làm", "ai có ca", "có ai làm", "mấy người làm",
+        "danh sách đi làm", "tổng giờ", "bao nhiêu tiếng", "mấy tiếng", "nhiều giờ nhất",
+        "ít giờ nhất", "bao nhiêu ca", "mấy ca", "lịch làm của", "lịch làm việc của",
+        "tuần này làm", "hôm nay ai làm"
+    ]
+    if any(k in msg for k in schedule_keywords) and not any(k in msg for k in ["đổi", "dời", "chuyển", "thêm", "xóa", "cho nghỉ"]):
+        target_emp = found_emps[0] if found_emps else ""
+        return "query_shift_schedule_and_hours", {"emp": target_emp, "day": day or "", "query_type": msg}
+
+    # ---------------------------------------------------------------------
+    # ROSTER MODIFICATION ACTIONS
+    # ---------------------------------------------------------------------
+
+    # Priority: Preference instruction
     if any(k in msg for k in ["dặn joy", "dặn em", "nhớ là", "sau này", "từ giờ", "từ nay", "nhớ nghen", "nhớ nhen", "nhớ nha"]):
         pref = "AVOID" if any(k in msg for k in ["đừng", "không", "hạn chế", "hông thích", "ko thích"]) else "PREFER"
         emp = found_emps[0] if found_emps else "All"
@@ -576,7 +1061,6 @@ def parse_intent_rule_based(
 
     # Case A: If user provided a time, but NO employee was matched in this turn:
     if time_str and not found_emps:
-        # Check if user explicitly tried to name an employee who isn't on the roster
         m_p = re.search(r"(?:cho|của|bạn|nhân viên)\s+([a-zA-Zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+)", msg)
         if m_p:
             cand = m_p.group(1).strip()
@@ -603,7 +1087,7 @@ def parse_intent_rule_based(
         if time_str:
             return "adjust_shift_hours", {"emp": emp, "day": day or prev_day or "Monday", "shift_time": time_str}
 
-        # 3. Adjust hours (single start or end time change e.g. "chỉnh giờ bắt đầu thành 7 giờ" / "từ 6 giờ thành 7 giờ")
+        # 3. Adjust hours (single start or end time change)
         row = next((r for r in roster_rows if str(r.get("Employee") or "").lower() == emp.lower()), None)
         cur_shift = row.get(day or prev_day or "Wednesday", "") if row else ""
         adj_time = parse_start_end_time_adjustment(msg, cur_shift)
@@ -614,19 +1098,7 @@ def parse_intent_rule_based(
         if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "chỉnh", "sửa", "đổi", "thay đổi", "xem ca", "ca", "thêm", "thêm ca", "1k", "1 k", "làm ca", "làm", "xếp", "xếp ca", "giờ"]):
             return "query_or_prompt_shift", {"emp": emp, "day": day or prev_day or "Monday"}
 
-    # Case D: Preference instruction
-    if any(k in msg for k in ["nhớ", "sau này", "từ giờ", "từ nay", "ưu tiên"]):
-        pref = "AVOID" if any(k in msg for k in ["đừng", "không", "hạn chế"]) else "PREFER"
-        emp = found_emps[0] if found_emps else "All"
-        return "save_manager_preference", {
-            "emp": emp,
-            "day": day or prev_day or "",
-            "preference": pref,
-            "weight": -100 if pref == "AVOID" else 50,
-            "notes": user_message,
-        }
-
-    # Case E: Greeting or mic check (ONLY when no employee was mentioned)
+    # Case D: Greeting or mic check (ONLY when no employee was mentioned)
     if not found_emps:
         greeting_patterns = [
             r"\bhello\b", r"\bhi\b", r"\bchào\b", r"\bjoy ơi\b", r"\bem ơi\b", r"\balo\b",
@@ -638,7 +1110,67 @@ def parse_intent_rule_based(
     return None, {}
 
 
+# =========================================================================
+# GEMINI 2.0 FLASH FALLBACK WITH EXPANDED TOOL DECLARATIONS
+# =========================================================================
+
 GEMINI_TOOLS_DECLARATION = [
+    {
+        "name": "query_employee_contact",
+        "description": "Tra cứu thông tin liên hệ của nhân viên trong app: số điện thoại, email, địa chỉ nhà, ngày sinh (DOB), ngày vào làm việc.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "emp": {"type": "STRING", "description": "Tên nhân viên"},
+                "query_type": {"type": "STRING", "description": "Loại thông tin: phone, email, address, dob, commencement"},
+            },
+            "required": ["emp"],
+        },
+    },
+    {
+        "name": "query_employee_role",
+        "description": "Tra cứu vị trí, chức vụ của nhân viên trong tiệm: ai là thợ làm bánh (baker), ai phụ bánh (baker assistant), ai là nhân viên bán hàng (service staff), chủ tiệm.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "emp": {"type": "STRING", "description": "Tên nhân viên nếu hỏi cụ thể một người, hoặc để trống nếu hỏi chung"},
+                "query_type": {"type": "STRING", "description": "Chức danh cần hỏi: baker, baker assistant, service staff"},
+            },
+        },
+    },
+    {
+        "name": "query_unavailability_restriction",
+        "description": "Tra cứu ngày nghỉ, hạn chế lịch làm việc (restrictions, availability) của nhân viên hoặc kiểm tra ai bận vào một ngày cụ thể.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "emp": {"type": "STRING", "description": "Tên nhân viên (nếu có)"},
+                "day": {"type": "STRING", "description": "Ngày trong tuần (Monday - Sunday) nếu có"},
+            },
+        },
+    },
+    {
+        "name": "query_shift_schedule_and_hours",
+        "description": "Tra cứu lịch làm việc trên bảng Roster: ai đi làm vào thứ mấy, tổng số giờ làm trong tuần của nhân viên, xếp hạng ai làm nhiều giờ / ít giờ nhất.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "emp": {"type": "STRING", "description": "Tên nhân viên (nếu hỏi giờ của một người)"},
+                "day": {"type": "STRING", "description": "Ngày trong tuần (nếu hỏi ai đi làm ngày đó)"},
+                "query_type": {"type": "STRING", "description": "Loại câu hỏi: ai đi làm, tổng giờ, nhiều giờ nhất, ít giờ nhất"},
+            },
+        },
+    },
+    {
+        "name": "query_holidays",
+        "description": "Tra cứu các ngày nghỉ lễ công cộng (Public Holidays) và kỳ nghỉ học sinh (School Holidays) tại tiểu bang Victoria.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query_type": {"type": "STRING", "description": "Loại ngày lễ cần hỏi"},
+            },
+        },
+    },
     {
         "name": "swap_shifts",
         "description": "Hoán đổi ca làm việc giữa 2 nhân viên trong 1 ngày cụ thể trong tuần.",
@@ -741,15 +1273,26 @@ def process_assistant_chat(
 ) -> Dict[str, Any]:
     """
     Main Assistant entry point.
-    Processes user voice/text message with 3-layer memory, runs tools,
-    updates roster, and returns Joy's Phan Rang reply.
+    Processes user voice/text message with omniscient app database knowledge,
+    instant sub-millisecond local execution, tool calling, and Joy's Phan Rang reply.
     """
+    # Auto-load latest finalized roster or draft if client passed an empty roster
+    if not roster_rows and db:
+        finalized = db.list_finalized_rosters()
+        if finalized:
+            latest_date = finalized[0]["date_str"]
+            roster_rows = db.load_finalized_roster(latest_date) or []
+        else:
+            drafts = db.list_roster_drafts("manager")
+            if drafts:
+                roster_rows, _ = db.load_roster_draft(drafts[0]["date_str"], "manager")
+
     history = db.get_recent_chat_history(session_id, limit=6) if db else []
     learned_rules = db.get_learned_rules(active_only=True) if db else []
     memory_facts = db.get_memory_facts() if db else []
 
-    all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows]
-    emp_summary = ", ".join(all_emp[:15])
+    all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows] if roster_rows else []
+    emp_summary = ", ".join(all_emp[:15]) if all_emp else "Robert, Viet, Aroha, Jane, Elizabeth, Anastasia, Jude, Aimi, Ainsley Mactier, Stella, Amy, Violet, Jack, Olivia, Shaelyn"
 
     alias_lines = []
     for k, v in PHONETIC_ALIASES.items():
@@ -779,9 +1322,26 @@ DANH SÁCH NHÂN VIÊN TIỆM: {emp_summary}
 QUY ĐỔI TÊN NÓI / BIỆT DANH SANG TÊN THẬT TRÊN BẢNG ROSTER:
 {alias_summary}
 
-QUY TẮC BẮT BUỘC KHI NHẬN LỆNH ĐỔI CA / THAY ĐỔI CA:
-- Nếu chị Nhi yêu cầu đổi ca, dời ca, bỏ ca, đổi ca của A sang cho B (ví dụ: "đổi ca của Elizabeth ngày thứ 2 sang cho Chan" -> Chan chính là Jane!), bạn PHẢI GỌI FUNCTION tương ứng (swap_shifts, reassign_shift, remove_shift, adjust_shift_hours).
-- TUYỆT ĐỐI KHÔNG hỏi lại "chị muốn đổi cho bạn nào" nếu câu nói đã chứa tên người nhận ca (như "sang cho Chan" -> Jane)! Phải gọi Function Call ngay!
+HỒ SƠ VÀ THÔNG TIN TOÀN DIỆN CỦA TIỆM (BẠN NẮM RÕ 100%):
+- Robert: Thợ làm bánh chính (Baker), Part-time, vào làm 22/01/2024, sinh 19/02/2004.
+- Viet: Chủ tiệm & Thợ bánh chính (Baker).
+- Aroha: Thợ phụ bánh (Baker Assistant), Part-time, vào làm 27/09/2021, sinh 24/05/2005. Nghỉ Chủ Nhật.
+- Jane: Chủ tiệm & Bán hàng (Store Owner / Service Staff).
+- Ainsley Mactier: Nhân viên bán hàng, Casual, SĐT: 0479122444, Số nhà: 0359192106, Email: ainsley.mac@outlook.com, Đ/C: 8 Knapton Ave, Beaconsfield Upper, vào làm 04/10/2021, sinh 14/08/2006.
+- Shaelyn: Nhân viên bán hàng, Casual, SĐT: 0466894554, Email: shaelyndean@gmail.com, Đ/C: 28 Moore Mews, sinh 25/02/2011.
+- Aimi: Nhân viên bán hàng, Casual, vào làm 01/10/2023, sinh 10/11/2006.
+- Elizabeth: Nhân viên bán hàng, Casual, vào làm 03/06/2024, sinh 30/07/2004.
+- Anastasia: Nhân viên bán hàng, Casual, vào làm 04/10/2021, sinh 02/03/2000.
+- Jude: Nhân viên bán hàng, Casual, sinh 28/04/2011, vướng lịch học các buổi chiều 4h-7h các ngày trong tuần.
+- Stella: Nhân viên bán hàng, Casual, vào làm 09/01/2024, sinh 03/07/2007.
+- Amy: Nhân viên bán hàng, Casual, sinh 27/02/2010.
+- Violet: Nhân viên bán hàng, Casual, sinh 27/02/2010, bận trước 4h chiều các ngày trong tuần.
+- Jack: Nhân viên bán hàng, Casual, sinh 28/04/2011, bận 4h30-7h tối.
+- Olivia: Nhân viên bán hàng, Casual, vào làm 27/05/2024, sinh 15/01/2007.
+
+QUY TẮC BẮT BUỘC KHI NHẬN LỆNH:
+- Nếu chị Nhi hỏi thông tin cá nhân (SĐT, email, địa chỉ, ngày sinh, ngày vào làm), vị trí, ngày nghỉ (unavailability), hoặc giờ làm việc, bạn trả lời chính xác, nhiệt tình theo phong cách Phan Rang.
+- Nếu chị Nhi yêu cầu đổi ca, dời ca, bỏ ca, đổi ca của A sang cho B, bạn PHẢI GỌI FUNCTION tương ứng (swap_shifts, reassign_shift, remove_shift, adjust_shift_hours).
 
 KÝ ỨC THÓI QUEN CỦA CHỊ NHI:
 {facts_summary}
@@ -791,7 +1351,7 @@ QUY TẮC ĐÃ HỌC:
 
     executed_actions = []
     final_reply = ""
-    updated_roster = [dict(r) for r in roster_rows]
+    updated_roster = [dict(r) for r in roster_rows] if roster_rows else []
 
     # Priority 1: Instant deterministic local intent execution (< 2 milliseconds!)
     action_name, action_params = parse_intent_rule_based(user_message, updated_roster, history)
@@ -800,7 +1360,16 @@ QUY TẮC ĐÃ HỌC:
         ok, reply, updated_roster, summary = execute_roster_action(action_name, action_params, updated_roster, db)
         if ok:
             final_reply = reply
-            if action_name not in ["greeting", "query_or_prompt_shift", "move_shift_day_prompt"]:
+            if action_name not in [
+                "greeting",
+                "query_or_prompt_shift",
+                "move_shift_day_prompt",
+                "query_employee_contact",
+                "query_employee_role",
+                "query_unavailability_restriction",
+                "query_shift_schedule_and_hours",
+                "query_holidays",
+            ]:
                 executed_actions.append(summary)
 
     # Priority 2: If no direct rule matched and Gemini API key is configured, call Gemini
@@ -822,7 +1391,14 @@ QUY TẮC ĐÃ HỌC:
                     args = fn_call.get("args") or {}
                     ok, reply, updated_roster, summary = execute_roster_action(name, args, updated_roster, db)
                     final_reply = reply
-                    executed_actions.append(summary)
+                    if name not in [
+                        "query_employee_contact",
+                        "query_employee_role",
+                        "query_unavailability_restriction",
+                        "query_shift_schedule_and_hours",
+                        "query_holidays",
+                    ]:
+                        executed_actions.append(summary)
                 else:
                     text_part = next((p.get("text") for p in parts if "text" in p), "")
                     final_reply = text_part.strip()
