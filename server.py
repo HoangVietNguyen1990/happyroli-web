@@ -116,6 +116,8 @@ def send_welcome_email_smtp(
     temp_password: str,
     portal_url: str = "",
     sender_name: str = "",
+    position: str = "Team Member",
+    classification: str = "Casual",
 ) -> tuple:
     cfg = load_smtp_config()
     smtp_server = cfg.get("smtp_server", "smtp.gmail.com")
@@ -127,33 +129,59 @@ def send_welcome_email_smtp(
     if not sender_name:
         sender_name = cfg.get("sender_name", "Brumby's Bakery Manager")
 
+    pos = str(position or "Team Member").strip()
+    clf = str(classification or "Casual").strip()
+
     if not recipient_email or not str(recipient_email).strip():
         return False, "Recipient email address is blank."
     if not sender_email or not sender_pass:
         return False, "SMTP credentials are not configured in system settings."
 
-    subject = "Welcome to Brumby's Pakenham! 🥐 — Your Account Setup & Portal Login"
-    body = f"""Hi {emp_name},
+    subject = f"🥐 Offer of Employment & Welcome to Brumby's Pakenham — {pos}"
+    body = f"""Dear {emp_name},
 
-Welcome to the team at Brumby's Pakenham! 🥐
+Congratulations! We are delighted to formally offer you employment as a {pos} ({clf}) with the team at Brumby's Bakery Pakenham.
 
-We use an online portal for managing shift rostering, weekly availability, and employee onboarding. Please set up your account by completing these quick steps:
+We were very impressed with your presentation and enthusiasm, and we are confident you will make a wonderful addition to our store.
 
-1. Log In to the Portal:
-Website: {portal_url}
-Username: {username}
-Temporary Password: {temp_password}
+==================================================
+OFFER OF EMPLOYMENT DETAILS
+==================================================
+• Position Title: {pos}
+• Employment Category: {clf}
+• Work Location: Brumby's Pakenham (Pakenham Central Marketplace)
+• Reporting To: Store Management / Bakery Owner
+• Applicable Award: Fast Food Industry Award / General Retail Industry Award
 
-2. Complete Your Setup Tasks:
-Once logged in, please complete the following tabs:
-📋 Personal Information Form: Fill out your contact details, Tax File Number (TFN), bank account details (for payroll), and superannuation fund.
-📅 My Availability & Constraints: Select the days and time windows you are available to work.
+==================================================
+EMPLOYEE ONBOARDING & ROSTER PORTAL
+==================================================
+We manage all weekly rosters, shift availability, and onboarding digitally through our dedicated staff portal.
 
-If you run into any issues, please feel free to reach out to store management.
+Please activate your employee account with the credentials below:
 
-Welcome aboard!
+🔗 Portal Website: {portal_url}
+👤 Username: {username}
+🔑 Temporary Password: {temp_password}
+
+REQUIRED SETUP TASKS (BEFORE FIRST SHIFT):
+Once logged in, please complete the following tabs in the portal:
+1. 📋 Personal Information & Payroll Form:
+   Fill in your contact details, Tax File Number (TFN), superannuation details, and bank account for payroll wage deposits.
+2. 📅 My Availability & Constraints:
+   Submit the days of the week and time windows you are available to work so we can build your weekly roster.
+3. 🔒 Change Password:
+   Update your temporary password to your own secure personal password.
+
+If you have any questions regarding your offer or need assistance getting set up, please do not hesitate to reach out to store management.
+
+Once again, congratulations and welcome to Brumby's Pakenham!
+
+Warm regards,
+
 {sender_name}
-Brumby's Pakenham
+Store Management
+Brumby's Bakery Pakenham
 """
     try:
         msg = MIMEMultipart()
@@ -787,7 +815,9 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
             user = str(body.get("username", "")).strip()
             pwd = str(body.get("temp_password", "TempPass123!")).strip()
             portal_url = str(body.get("portal_url", "")).strip()
-            ok, msg = send_welcome_email_smtp(recip, name, user, pwd, portal_url)
+            pos = str(body.get("position", "Team Member")).strip()
+            clf = str(body.get("classification", "Casual")).strip()
+            ok, msg = send_welcome_email_smtp(recip, name, user, pwd, portal_url, position=pos, classification=clf)
             self._send_json(200, {"ok": ok, "message": msg})
             return
 
@@ -877,7 +907,14 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
             email_sent = False
             email_msg = "Welcome email not requested."
             if send_welcome and new_email:
-                email_sent, email_msg = send_welcome_email_smtp(new_email, new_name, new_user, new_pass)
+                email_sent, email_msg = send_welcome_email_smtp(
+                    new_email,
+                    new_name,
+                    new_user,
+                    new_pass,
+                    position=new_role or "Team Member",
+                    classification=new_type or "Casual",
+                )
 
             self._send_json(200, {
                 "ok": True,

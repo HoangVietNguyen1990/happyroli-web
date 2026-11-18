@@ -1665,12 +1665,17 @@
     async function resendWelcomeEmail(userKey) {
       const emailInput = document.getElementById(`pf_email_${userKey}`);
       const nameInput = document.getElementById(`pf_name_${userKey}`);
+      const classInput = document.getElementById(`pf_class_${userKey}`);
       const recipient = (emailInput ? emailInput.value : '').trim();
       const empName = (nameInput ? nameInput.value : userKey).trim();
+      const prof = (profilesCache[userKey] || {}).profile || {};
+      const pos = prof.employment_level || 'Team Member';
+      const clf = (classInput ? classInput.value : prof.classification) || 'Casual';
+
       if (!recipient) {
         return alert('Please enter an Email Address in the profile first.');
       }
-      if (!confirm(`Dispatch Welcome Onboarding Email to ${empName} (${recipient}) with login credentials?`)) return;
+      if (!confirm(`Dispatch Offer of Employment & Portal Welcome Email to ${empName} (${recipient}) for ${pos} (${clf})?`)) return;
 
       try {
         const res = await fetch('/api/notify/welcome', {
@@ -1680,7 +1685,9 @@
             recipient_email: recipient,
             emp_name: empName,
             username: userKey,
-            temp_password: 'TempPass123!'
+            temp_password: 'TempPass123!',
+            position: pos,
+            classification: clf
           })
         });
         const data = await res.json();
