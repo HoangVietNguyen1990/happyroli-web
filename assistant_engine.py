@@ -543,6 +543,11 @@ def process_assistant_chat(
     all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows]
     emp_summary = ", ".join(all_emp[:15])
 
+    alias_lines = []
+    for k, v in PHONETIC_ALIASES.items():
+        alias_lines.append(f"- {k}: thường nghe/nói là {', '.join(v[:8])}")
+    alias_summary = "\n".join(alias_lines)
+
     rules_summary = "\n".join([f"- {r.get('notes')} ({r.get('preference')})" for r in learned_rules[:5]]) or "Chưa có quy tắc nào."
     facts_summary = "\n".join([f"- {f.get('fact_summary')}" for f in memory_facts[:5]]) or "Chưa có ghi chú đặc biệt."
 
@@ -561,6 +566,14 @@ PHONG CÁCH GIAO TIẾP PHAN RANG CỦA JOY:
 - Ví dụ: "Xong rồi nè chị Nhi! Joy đổi ca thứ Tư từ 6h sáng tới 2h chiều của Shaelyn qua cho Milina rồi nghen."
 
 DANH SÁCH NHÂN VIÊN TIỆM: {emp_summary}
+
+QUY ĐỔI TÊN NÓI / BIỆT DANH SANG TÊN THẬT TRÊN BẢNG ROSTER:
+{alias_summary}
+
+QUY TẮC BẮT BUỘC KHI NHẬN LỆNH ĐỔI CA / THAY ĐỔI CA:
+- Nếu chị Nhi yêu cầu đổi ca, dời ca, bỏ ca, đổi ca của A sang cho B (ví dụ: "đổi ca của Elizabeth ngày thứ 2 sang cho Chan" -> Chan chính là Jane!), bạn PHẢI GỌI FUNCTION tương ứng (swap_shifts, reassign_shift, remove_shift, adjust_shift_hours).
+- TUYỆT ĐỐI KHÔNG hỏi lại "chị muốn đổi cho bạn nào" nếu câu nói đã chứa tên người nhận ca (như "sang cho Chan" -> Jane)! Phải gọi Function Call ngay!
+
 KÝ ỨC THÓI QUEN CỦA CHỊ NHI:
 {facts_summary}
 QUY TẮC ĐÃ HỌC:
@@ -597,20 +610,26 @@ QUY TẮC ĐÃ HỌC:
         except Exception as e:
             print(f"[Joy Assistant] Gemini API error, falling back to pattern matcher: {e}")
 
-    # Fallback to smart rule-based parser if no API key or LLM didn't call tool
-    if not final_reply:
+    # Fallback to smart rule-based parser if no action was executed yet
+    # (Catches cases where Gemini answered conversationally without triggering the tool, or no API key)
+    if not executed_actions:
         action_name, action_params = parse_intent_rule_based(user_message, updated_roster, history)
-        if action_name:
+        if action_name in ["swap_shifts", "reassign_shift", "remove_shift", "adjust_shift_hours", "save_manager_preference"]:
             ok, reply, updated_roster, summary = execute_roster_action(action_name, action_params, updated_roster, db)
-            final_reply = reply
-            executed_actions.append(summary)
-        else:
-            # Check if Joy already spoke recently to avoid repeating long text
-            last_joy_msg = next((h.get("message_text", "") for h in reversed(history) if h.get("speaker") == "Joy"), "")
-            if not last_joy_msg or len(history) <= 1:
-                final_reply = "Dạ Joy nghe nè chị Nhi! Chị dặn Joy đổi ca bạn nào nghen!"
+            if ok:
+                final_reply = reply
+                executed_actions.append(summary)
+        elif not final_reply:
+            if action_name == "query_or_prompt_shift":
+                ok, reply, updated_roster, summary = execute_roster_action(action_name, action_params, updated_roster, db)
+                final_reply = reply
             else:
-                final_reply = "Dạ, Joy nghe nè chị."
+                # Check if Joy already spoke recently to avoid repeating long text
+                last_joy_msg = next((h.get("message_text", "") for h in reversed(history) if h.get("speaker") == "Joy"), "")
+                if not last_joy_msg or len(history) <= 1:
+                    final_reply = "Dạ Joy nghe nè chị Nhi! Chị dặn Joy đổi ca bạn nào nghen!"
+                else:
+                    final_reply = "Dạ, Joy nghe nè chị."
 
     # Save to chat history
     if db:

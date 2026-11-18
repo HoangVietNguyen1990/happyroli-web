@@ -8,7 +8,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib.parse
 import urllib.request
 from urllib.parse import parse_qs, urlparse
@@ -478,24 +478,30 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
         pass
 
     def _send_json(self, status_code: int, payload: dict) -> None:
-        body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
+            self.send_response(status_code)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def _send_csv(self, filename: str, csv_text: str) -> None:
-        body = csv_text.encode("utf-8-sig")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/csv; charset=utf-8")
-        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            body = csv_text.encode("utf-8-sig")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def _read_json_body(self) -> dict:
         try:
@@ -510,6 +516,24 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._send_json(200, {"ok": True})
 
+    def do_HEAD(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path in ("/", "/index.html"):
+            index_file = os.path.join(STATIC_DIR, "index.html")
+            if os.path.exists(index_file):
+                size = os.path.getsize(index_file)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(size))
+                self.send_header("Connection", "keep-alive")
+                self.end_headers()
+                return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -518,13 +542,16 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             index_file = os.path.join(STATIC_DIR, "index.html")
             if os.path.exists(index_file):
-                with open(index_file, "rb") as f:
-                    content = f.read()
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(content)))
-                self.end_headers()
-                self.wfile.write(content)
+                try:
+                    with open(index_file, "rb") as f:
+                        content = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(content)))
+                    self.end_headers()
+                    self.wfile.write(content)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
                 return
 
         if path == "/api/summary":
@@ -735,7 +762,10 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
                     self.send_header("Accept-Ranges", "bytes")
                     self.send_header("Cache-Control", "public, max-age=86400")
                     self.end_headers()
-                    self.wfile.write(audio_data)
+                    try:
+                        self.wfile.write(audio_data)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
                     return
             except Exception as e:
                 self._send_json(500, {"ok": False, "error": str(e)})
@@ -1156,7 +1186,9 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8080):
-    server = HTTPServer((host, port), HappyRollyRequestHandler)
+    ThreadingHTTPServer.allow_reuse_address = True
+    server = ThreadingHTTPServer((host, port), HappyRollyRequestHandler)
+    server.daemon_threads = True
     print(f"HappyRolly Standalone Server v2 running at http://{host}:{port}")
     server.serve_forever()
 
