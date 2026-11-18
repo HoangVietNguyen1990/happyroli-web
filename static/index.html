@@ -2228,6 +2228,26 @@
       }
     }
 
+    function unlockJoyAudioOnUserGesture() {
+      initJoyStaticAudios();
+      if (joyDaAudio) {
+        joyDaAudio.muted = true;
+        joyDaAudio.play().then(() => {
+          joyDaAudio.pause();
+          joyDaAudio.muted = false;
+          joyDaAudio.currentTime = 0;
+        }).catch(() => {});
+      }
+      if (joyByeAudio) {
+        joyByeAudio.muted = true;
+        joyByeAudio.play().then(() => {
+          joyByeAudio.pause();
+          joyByeAudio.muted = false;
+          joyByeAudio.currentTime = 0;
+        }).catch(() => {});
+      }
+    }
+
     function getBestVietnameseVoice() {
       if (!window.speechSynthesis) return null;
       if (cachedBestVoice) return cachedBestVoice;
@@ -2269,6 +2289,7 @@
     }
 
     function openJoyModal() {
+      unlockJoyAudioOnUserGesture();
       isJoyModalOpen = true;
       document.getElementById('joyModal').classList.remove('hidden');
       updateJoyToggleButton();
@@ -2583,6 +2604,7 @@
     }
 
     function toggleJoyVoice() {
+      unlockJoyAudioOnUserGesture();
       if (isJoyMuted) {
         toggleJoyMute();
         return;
@@ -2830,7 +2852,7 @@
         if (!audio.currentTime || audio.paused) {
           doLocalFallback();
         }
-      }, 2500);
+      }, 4000);
 
       audio.onplay = () => {
         clearTimeout(loadTimeout);

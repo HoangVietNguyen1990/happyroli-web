@@ -82,7 +82,11 @@ PHONETIC_ALIASES = {
     "Milina": ["milina", "milana", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena"],
     "Milana": ["milina", "milana", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena"],
     "Violet": ["violet", "vai ô lét", "vi ô lét", "vai let", "vi let", "vai-o-let"],
-    "Aimi": ["aimi", "ai mi", "ai my", "ay mi"],
+    "Aimi": [
+        "aimi", "ai mi", "ai mì", "ai my", "ai mỳ", "ay mi", "ay my",
+        "ai-mi", "ai-mì", "ai-my", "e mi", "ê mi", "e mì", "ê mì",
+        "a mi", "a mì", "aimy", "em mi", "em mì", "mai mày", "mai may"
+    ],
     "Ainsley Mactier": ["ainsley", "mactier", "en xli", "en xly", "mắc ti er", "mác ti ơ", "en-xli", "mắc ti e", "ainsley mactier"],
     "Stella": ["stella", "sờ te la", "te la", "tét la", "ste la", "ten la"],
     "Amy": ["amy", "e mi", "ê mi", "ay mi"],
@@ -98,7 +102,9 @@ ASSISTANT_VOCATIVES = {"joy", "troy", "chơi", "choi", "chơi ơi", "joy ơi", "
 NON_NAME_STOP_WORDS = {
     "ngày", "thứ", "chơi", "thêm", "được", "không", "giúp", "muốn", "người", "trời",
     "hãy", "sang", "rời", "dời", "cho", "ca", "giờ", "làm", "nghen", "nhen", "nghe",
-    "nè", "nhe", "nha", "nó", "nào", "nghỉ", "đổi", "sửa", "xếp", "nên", "vào", "qua"
+    "nè", "nhe", "nha", "nó", "nào", "nghỉ", "đổi", "sửa", "xếp", "nên", "vào", "qua",
+    "ai", "bạn", "chị", "em", "nữa", "thế", "của", "từ", "tới", "đến", "có", "thể",
+    "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "sáng", "trưa", "chiều", "tối"
 }
 
 
