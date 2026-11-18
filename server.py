@@ -9,6 +9,8 @@ from datetime import date, datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import urllib.parse
+import urllib.request
 from urllib.parse import parse_qs, urlparse
 
 HAPPYROLLY_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -712,6 +714,32 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
             rules = db.get_learned_rules(active_only=True)
             self._send_json(200, {"ok": True, "rules": rules})
             return
+
+        if path == "/api/assistant/tts":
+            text = qs.get("text", [""])[0]
+            if not text:
+                self._send_json(400, {"ok": False, "error": "No text provided"})
+                return
+            clean_text = re.sub(r"[\U00010000-\U0010ffff]", "", text).strip()
+            if not clean_text:
+                clean_text = "Dạ xong rồi nè chị Nhi"
+            tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={urllib.parse.quote(clean_text[:200])}&tl=vi&client=tw-ob"
+            try:
+                req = urllib.request.Request(tts_url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    audio_data = resp.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "audio/mpeg")
+                    self.send_header("Content-Length", str(len(audio_data)))
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Accept-Ranges", "bytes")
+                    self.send_header("Cache-Control", "public, max-age=86400")
+                    self.end_headers()
+                    self.wfile.write(audio_data)
+                    return
+            except Exception as e:
+                self._send_json(500, {"ok": False, "error": str(e)})
+                return
 
         self._send_json(404, {"ok": False, "error": "Not found"})
 

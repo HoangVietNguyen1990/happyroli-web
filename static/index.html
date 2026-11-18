@@ -819,78 +819,82 @@
       </div>
     </section>
 
-    <!-- ==================== JOY AI VOICE ASSISTANT MODAL ==================== -->
-    <div id="joyModal" onclick="if(event.target===this)closeJoyModal()" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition">
-      <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-spruce via-forest to-emerald-800 text-white p-4 flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-full bg-gradient-to-tr from-amber-300 to-rose-300 flex items-center justify-center text-2xl shadow-inner border-2 border-white/40">
-              👧🏻
-            </div>
-            <div>
-              <div class="font-black text-sm flex items-center gap-2">
-                <span>Em Joy</span>
-                <span class="bg-amber-400 text-charcoal text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Phan Rang 🥖</span>
-              </div>
-              <div class="text-[11px] text-emerald-200">Trợ lý Lịch Roster của Chị Nhi</div>
-            </div>
+    <!-- ==================== JOY AI VOICE ASSISTANT FLOATING DOCK (NON-BLOCKING) ==================== -->
+    <div id="joyModal" class="hidden fixed bottom-3 right-3 sm:right-6 z-40 w-[95vw] sm:w-[420px] max-w-[440px] bg-white rounded-3xl shadow-2xl border-2 border-forest overflow-hidden flex flex-col transition-all duration-300 pointer-events-auto">
+      <!-- Header Bar with Minimize & Controls -->
+      <div class="bg-gradient-to-r from-spruce via-forest to-emerald-800 text-white p-3 flex items-center justify-between cursor-pointer select-none" onclick="toggleJoyCollapse()">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-300 to-rose-300 flex items-center justify-center text-xl shadow-inner border border-white/40 flex-shrink-0">
+            👧🏻
           </div>
-          <div class="flex items-center gap-2">
-            <button onclick="toggleJoyTts()" id="btnJoyTts" class="text-xs bg-black/20 hover:bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/20 flex items-center gap-1 font-bold">
-              <span id="ttsIcon">🔊</span> Bật tiếng
-            </button>
-            <button onclick="closeJoyModal()" class="text-white hover:bg-white/20 w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg">✕</button>
+          <div>
+            <div class="font-black text-xs flex items-center gap-1.5">
+              <span>Em Joy</span>
+              <span class="bg-amber-400 text-charcoal text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">Phan Rang 🥖</span>
+            </div>
+            <div class="text-[10px] text-emerald-200">Trợ lý Lịch Roster • Chạm để thu nhỏ/mở rộng</div>
           </div>
         </div>
+        <div class="flex items-center gap-1.5" onclick="event.stopPropagation()">
+          <button onclick="toggleJoyCollapse()" id="btnJoyCollapse" class="text-xs bg-black/20 hover:bg-black/40 px-2 py-1 rounded-lg border border-white/20 font-bold" title="Thu nhỏ/Mở rộng">
+            <span id="collapseIcon">🔽</span>
+          </button>
+          <button onclick="toggleJoyTts()" id="btnJoyTts" class="text-xs bg-black/20 hover:bg-black/40 px-2 py-1 rounded-lg border border-white/20 font-bold" title="Bật/Tắt âm thanh">
+            <span id="ttsIcon">🔊</span>
+          </button>
+          <button onclick="closeJoyModal()" class="text-white hover:bg-white/20 w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm">✕</button>
+        </div>
+      </div>
 
+      <!-- Collapsible Body (Leaves full roster table visible when collapsed or in view) -->
+      <div id="joyBody" class="flex flex-col max-h-[70vh] sm:max-h-[460px] transition-all duration-300">
         <!-- Chat Log Area -->
-        <div id="joyChatLog" class="p-4 overflow-y-auto flex-1 space-y-3 bg-gray-50 text-xs min-h-[220px] max-h-[360px]">
+        <div id="joyChatLog" class="p-3.5 overflow-y-auto flex-1 space-y-2.5 bg-gray-50 text-xs min-h-[160px] max-h-[220px]">
           <div class="flex items-start gap-2.5">
             <div class="w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center text-sm flex-shrink-0">👧🏻</div>
-            <div class="bg-white p-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-200 max-w-[85%] space-y-1">
+            <div class="bg-white p-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-200 max-w-[88%] space-y-1">
               <div class="font-extrabold text-forest">Em Joy</div>
-              <div class="text-gray-800">Dạ Joy chào chị Nhi! Joy đang sẵn sàng rồi nè. Chị Nhi muốn đổi ca của bạn nào, thứ mấy với mấy giờ thì nói hoặc dặn Joy làm liền nghen! 🥖✨</div>
+              <div class="text-gray-800 leading-relaxed">Dạ Joy chào chị Nhi! Chị xem bảng lịch bên trên rồi dặn Joy đổi ca của bạn nào, thứ mấy với mấy giờ Joy sửa liền nghen! 🥖✨</div>
             </div>
           </div>
         </div>
 
         <!-- Action / Status Alert Bar -->
-        <div id="joyActionStatus" class="hidden px-4 py-2 bg-emerald-50 border-t border-emerald-100 text-[11px] font-bold text-emerald-800 flex items-center justify-between">
-          <span id="joyActionText">✅ Đã cập nhật Roster</span>
-          <span class="text-emerald-500">Live Updated</span>
+        <div id="joyActionStatus" class="hidden px-3.5 py-1.5 bg-emerald-50 border-t border-emerald-100 text-[11px] font-bold text-emerald-800 flex items-center justify-between">
+          <span id="joyActionText">✅ Đã cập nhật Roster trực tiếp</span>
+          <span class="text-emerald-500 font-extrabold">Live</span>
         </div>
 
         <!-- Voice & Text Input Toolbar -->
-        <div class="p-3 bg-white border-t border-gray-200 space-y-2">
+        <div class="p-2.5 bg-white border-t border-gray-200 space-y-2">
           <!-- Big Interactive Microphone & Dedicated Mute Button -->
-          <div class="flex items-center justify-center gap-5 py-1">
-            <button id="joyMicBtn" onclick="toggleJoyVoice()" class="relative group flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-600 to-forest text-white shadow-lg hover:scale-105 active:scale-95 transition" title="Bật/Tắt Micro">
+          <div class="flex items-center justify-center gap-4 py-1">
+            <button id="joyMicBtn" onclick="toggleJoyVoice()" class="relative group flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-600 to-forest text-white shadow-lg hover:scale-105 active:scale-95 transition" title="Bật/Tắt Micro">
               <span id="joyMicWave" class="hidden absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
               <span id="joyMicIcon" class="text-2xl relative z-10">🎙️</span>
             </button>
-            <button id="joyMuteBtn" onclick="toggleJoyMute()" class="flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 shadow-sm transition active:scale-95" title="Tắt mic tạm thời để nói chuyện với người khác">
+            <button id="joyMuteBtn" onclick="toggleJoyMute()" class="flex flex-col items-center justify-center px-3.5 py-2 rounded-2xl bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 shadow-sm transition active:scale-95" title="Tắt mic tạm thời để nói chuyện với người khác">
               <span id="joyMuteIcon" class="text-xl">🎙️</span>
               <span id="joyMuteText" class="text-[10px] font-black mt-0.5 uppercase tracking-wide">Tắt Mic</span>
             </button>
           </div>
-          <div id="joyListeningTip" class="text-center text-[11px] text-gray-500 font-semibold">
+          <div id="joyListeningTip" class="text-center text-[10px] text-gray-500 font-semibold">
             Chạm micro để nói chuyện bằng giọng nói, hoặc chạm Tắt Mic khi nói chuyện riêng nghen!
           </div>
 
           <!-- Text Input Form -->
           <form onsubmit="handleJoySend(event)" class="flex gap-2">
-            <input type="text" id="joyTextInput" placeholder="ví dụ: Đổi ca thứ 4 của Shaelyn qua cho Milina..." class="flex-1 border border-gray-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-forest" />
-            <button type="submit" class="bg-forest hover:bg-spruce text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">Gửi</button>
+            <input type="text" id="joyTextInput" placeholder="ví dụ: Đổi ca thứ 4 của Shaelyn qua cho Milina..." class="flex-1 border border-gray-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-forest" />
+            <button type="submit" class="bg-forest hover:bg-spruce text-white font-extrabold px-3.5 py-1.5 rounded-xl text-xs shadow">Gửi</button>
           </form>
         </div>
 
         <!-- Quick Suggestions Chips -->
-        <div class="px-4 py-2.5 bg-gray-100 text-[11px] flex flex-wrap gap-1.5 border-t border-gray-200">
+        <div class="px-3 py-2 bg-gray-100 text-[10px] flex flex-wrap gap-1.5 border-t border-gray-200">
           <span class="text-gray-400 font-bold self-center">Gợi ý:</span>
-          <button onclick="quickJoyAsk('Đổi ca thứ 4 của Shaelyn qua cho Milina')" class="bg-white hover:bg-gray-200 px-2.5 py-1 rounded-full border border-gray-200 text-gray-700">🔄 Đổi ca thứ 4</button>
-          <button onclick="quickJoyAsk('Thứ 7 cho Jack nghỉ nghen')" class="bg-white hover:bg-gray-200 px-2.5 py-1 rounded-full border border-gray-200 text-gray-700">🏖️ Thứ 7 cho Jack nghỉ</button>
-          <button onclick="quickJoyAsk('Nhớ từ nay về sau thứ 7 đừng xếp Jack ca mở cửa nghen')" class="bg-white hover:bg-gray-200 px-2.5 py-1 rounded-full border border-gray-200 text-amber-800">🧠 Dặn Joy nhớ luật</button>
+          <button onclick="quickJoyAsk('Đổi ca thứ 4 của Shaelyn qua cho Milina')" class="bg-white hover:bg-gray-200 px-2 py-0.5 rounded-full border border-gray-200 text-gray-700">🔄 Đổi ca thứ 4</button>
+          <button onclick="quickJoyAsk('Thứ 7 cho Jack nghỉ nghen')" class="bg-white hover:bg-gray-200 px-2 py-0.5 rounded-full border border-gray-200 text-gray-700">🏖️ Thứ 7 cho Jack nghỉ</button>
+          <button onclick="quickJoyAsk('Nhớ từ nay về sau thứ 7 đừng xếp Jack ca mở cửa nghen')" class="bg-white hover:bg-gray-200 px-2 py-0.5 rounded-full border border-gray-200 text-amber-800">🧠 Dặn Joy nhớ</button>
         </div>
       </div>
     </div>
@@ -2477,16 +2481,53 @@
       }
     }
 
+    let isJoyCollapsed = false;
+    let currentJoyAudio = null;
+
+    function toggleJoyCollapse() {
+      isJoyCollapsed = !isJoyCollapsed;
+      const body = document.getElementById('joyBody');
+      const icon = document.getElementById('collapseIcon');
+      if (body) {
+        body.classList.toggle('hidden', isJoyCollapsed);
+      }
+      if (icon) {
+        icon.textContent = isJoyCollapsed ? '🔼' : '🔽';
+      }
+    }
+
     function speakJoyReply(text) {
+      if (!joyTtsEnabled) return;
+      if (currentJoyAudio) {
+        try { currentJoyAudio.pause(); } catch(e){}
+        currentJoyAudio = null;
+      }
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+      const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+      if (!clean) return;
+
+      // 1. High Quality Vietnamese Female Voice via Backend Stream
+      try {
+        const audioUrl = '/api/assistant/tts?text=' + encodeURIComponent(clean);
+        currentJoyAudio = new Audio(audioUrl);
+        currentJoyAudio.play().catch(err => {
+          console.warn('Backend TTS autoplay blocked or error, falling back to browser TTS:', err);
+          fallbackBrowserTts(clean);
+        });
+      } catch (err) {
+        fallbackBrowserTts(clean);
+      }
+    }
+
+    function fallbackBrowserTts(clean) {
       if (!window.speechSynthesis) return;
-      window.speechSynthesis.cancel();
-      const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
       const utter = new SpeechSynthesisUtterance(clean);
       utter.lang = 'vi-VN';
       utter.rate = 1.05;
-      utter.pitch = 1.15;
+      utter.pitch = 1.25;
       const voices = window.speechSynthesis.getVoices();
-      const viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VN'));
+      const viVoice = voices.find(v => (v.lang.includes('vi') || v.lang.includes('VN')) && !v.name.toLowerCase().includes('david') && !v.name.toLowerCase().includes('male'));
       if (viVoice) utter.voice = viVoice;
       window.speechSynthesis.speak(utter);
     }
