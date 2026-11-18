@@ -72,13 +72,14 @@ PHONETIC_ALIASES = {
     "Robert": ["robert", "rô bốt", "ro bốt", "rô bớt", "ro bớt", "rô béc", "rô-bớt", "ro béc", "rô-bét"],
     "Elizabeth": [
         "elizabeth", "helizabeth", "ê li za bét", "ê li za bet", "ê li", "ê-li", "li za", "lisa", "ly za",
-        "bét", "bết", "li sa", "lisa pham", "lisa phạm", "e li", "e-li", "li-za", "hê li za bét"
+        "bét", "bết", "li sa", "lisa pham", "lisa phạm", "e li", "e-li", "li-za", "hê li za bét", "elisabeth"
     ],
     "Anastasia": [
-        "anastasia", "natasha", "na ta sha", "anatashia", "na ta sia", "a na", "a-na",
+        "anastasia", "annastasia", "anatasia", "annatasia", "anastacia", "anastatia", "anastasiya",
+        "natasha", "na ta sha", "anatashia", "na ta sia", "a na", "a-na", "anas",
         "a na sờ ta sia", "na sờ ta sia", "a na sta sia", "ana"
     ],
-    "Milina": ["milina", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina"],
+    "Milina": ["milina", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina", "milena"],
     "Violet": ["violet", "vai ô lét", "vi ô lét", "vai let", "vi let", "vai-o-let"],
     "Aimi": ["aimi", "ai mi", "ai my", "ay mi"],
     "Ainsley Mactier": ["ainsley", "mactier", "en xli", "en xly", "mắc ti er", "mác ti ơ", "en-xli", "mắc ti e", "ainsley mactier"],
@@ -86,40 +87,95 @@ PHONETIC_ALIASES = {
     "Amy": ["amy", "e mi", "ê mi", "ay mi"],
     "Jack": ["jack", "dách", "dzắc", "giắc", "dắt", "zắc", "giắt"],
     "Olivia": ["olivia", "ô li via", "li via", "ô li", "ô-li", "o li via"],
-    "Shaelyn": ["shaelyn", "sê lin", "se lin", "sa lin", "sơ lin", "sa e lin", "sa-lin", "se-lin", "xe lin"],
+    "Shaelyn": ["shaelyn", "sê lin", "se lin", "sa lin", "sơ lin", "sa e lin", "sa-lin", "se-lin", "xe lin", "shaelynn"],
     "Aroha": ["aroha", "a rô ha", "a ro ha", "ro ha", "a lô ha", "a-ro-ha"],
     "Viet": ["viet", "việt", "anh việt"],
     "Jude": ["jude", "dút", "dút đơ", "giu đê", "giu đe"],
 }
 
+ASSISTANT_VOCATIVES = {"joy", "troy", "chơi", "choi", "chơi ơi", "joy ơi", "troy ơi", "em ơi", "troi", "ok chơi ơi", "ok joy", "ok troy"}
+NON_NAME_STOP_WORDS = {"ngày", "thứ", "chơi", "thêm", "được", "không", "giúp", "muốn", "người", "trời", "hãy", "sang", "rời", "dời", "cho", "ca", "giờ", "làm"}
+
 
 def normalize_day(text: str) -> Optional[str]:
     low = text.lower().strip()
-    for k, v in DAYS_MAP.items():
+    for k in sorted(DAYS_MAP.keys(), key=len, reverse=True):
         if k in low:
-            return v
+            return DAYS_MAP[k]
     return None
 
 
-def find_employees_in_text(text: str, available_names: List[str]) -> List[str]:
-    """Finds all employees mentioned in text using strict word boundaries and phonetic aliases."""
-    t = " " + text.lower() + " "
+def find_days_in_text(text: str) -> List[str]:
+    """Finds all days of week mentioned in text in chronological order."""
+    low = text.lower()
     found = []
-    for real_name in available_names:
-        first = real_name.lower().split()[0]
-        aliases = [real_name.lower(), first] + PHONETIC_ALIASES.get(real_name, []) + PHONETIC_ALIASES.get(first, [])
-        for a in aliases:
-            pattern = (
-                r"(?<![a-zA-Z0-9_àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])"
-                + re.escape(a)
-                + r"(?![a-zA-Z0-9_àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])"
-            )
-            m = re.search(pattern, t)
-            if m:
-                found.append((m.start(), real_name))
-                break
+    for k in sorted(DAYS_MAP.keys(), key=len, reverse=True):
+        pat = (
+            r"(?<![a-zA-Z0-9_àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])"
+            + re.escape(k)
+            + r"(?![a-zA-Z0-9_àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])"
+        )
+        for m in re.finditer(pat, low):
+            found.append((m.start(), m.end(), DAYS_MAP[k]))
     found.sort(key=lambda x: x[0])
-    return [name for _, name in found]
+    clean = []
+    last_end = -1
+    for start, end, day in found:
+        if start >= last_end:
+            clean.append(day)
+            last_end = end
+    return clean
+
+
+def find_employees_in_text(text: str, available_names: List[str]) -> List[str]:
+    """Finds all employees mentioned using phonetic aliases and fuzzy sound-alike matching."""
+    import difflib
+
+    t_clean = text.lower()
+    for voc in ["chơi ơi", "joy ơi", "troy ơi", "em ơi", "ok chơi ơi", "ok joy", "ok troy"]:
+        t_clean = t_clean.replace(voc, " ")
+
+    alias_to_real = {}
+    for real in available_names:
+        first = real.lower().split()[0]
+        alias_to_real[real.lower()] = real
+        alias_to_real[first] = real
+        for a in PHONETIC_ALIASES.get(real, []):
+            if a.lower() not in ASSISTANT_VOCATIVES:
+                alias_to_real[a.lower()] = real
+
+    t = " " + t_clean + " "
+    found = []
+
+    # 1. Exact alias matches (multi-word first)
+    for a in sorted(alias_to_real.keys(), key=len, reverse=True):
+        real = alias_to_real[a]
+        pattern = (
+            r"(?<![a-zA-Z0-9_àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])"
+            + re.escape(a)
+            + r"(?![a-zA-Z0-9_àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ])"
+        )
+        for m in re.finditer(pattern, t):
+            if not any(abs(m.start() - pos) < 3 for pos, _ in found):
+                found.append((m.start(), real))
+
+    # 2. Fuzzy match individual words >= 4 chars
+    words = re.findall(r"[a-zA-Z]+", t_clean)
+    for w in words:
+        if len(w) >= 4 and w not in NON_NAME_STOP_WORDS and w not in ASSISTANT_VOCATIVES:
+            matches = difflib.get_close_matches(w, list(alias_to_real.keys()), n=1, cutoff=0.72)
+            if matches:
+                matched_real = alias_to_real[matches[0]]
+                if matched_real not in [r for _, r in found]:
+                    pos = t_clean.find(w)
+                    found.append((pos, matched_real))
+
+    found.sort(key=lambda x: x[0])
+    res = []
+    for _, r in found:
+        if r not in res:
+            res.append(r)
+    return res
 
 
 def match_employee_name(name_query: str, available_names: List[str]) -> Optional[str]:
@@ -166,6 +222,11 @@ def format_shift_time_vi(shift_str: str) -> str:
 def parse_time_range(text: str) -> Optional[str]:
     """Extracts a normalized shift time range e.g. '12:00 - 17:00' from natural Vietnamese."""
     low = text.lower()
+    if any(k in low for k in ["ca sáng", "sáng sớm", "ca mở cửa"]):
+        return "07:00 - 12:00"
+    if any(k in low for k in ["ca chiều", "ca đóng cửa", "ca tối"]):
+        return "12:30 - 17:30"
+
     norm = re.sub(r"(\d{1,2})\s*giờ", r"\1h", low)
     m = re.search(
         r"(\d{1,2})(?:h(\d{2})?|:(\d{2}))?\s*(sáng|trưa|chiều|tối)?\s*(?:tới|đến|-)\s*(\d{1,2})(?:h(\d{2})?|:(\d{2}))?\s*(sáng|trưa|chiều|tối)?",
@@ -215,7 +276,45 @@ def execute_roster_action(
 
     day_vi = DAYS_VI_NAMES.get(day, day)
 
-    if action_type == "swap_shifts":
+    if action_type == "move_shift_day":
+        emp_raw = params.get("emp", "")
+        from_day = params.get("from_day")
+        to_day = params.get("to_day")
+        if from_day:
+            from_day = normalize_day(from_day) or from_day
+        if to_day:
+            to_day = normalize_day(to_day) or to_day
+        if from_day not in DAYS_VI_NAMES:
+            from_day = "Monday"
+        if to_day not in DAYS_VI_NAMES:
+            to_day = "Wednesday"
+
+        from_day_vi = DAYS_VI_NAMES.get(from_day, from_day)
+        to_day_vi = DAYS_VI_NAMES.get(to_day, to_day)
+        emp = match_employee_name(emp_raw, all_emp_names)
+
+        if not emp:
+            return False, f"Chị Nhi ơi, Joy hổng tìm thấy bạn '{emp_raw}' trong tiệm á!", roster_rows, {}
+
+        row = next((r for r in roster_rows if str(r.get("Employee") or "").lower() == emp.lower()), None)
+        if not row:
+            return False, f"Chị Nhi ơi, Joy hổng tìm thấy dòng của {emp} trên bảng á!", roster_rows, {}
+
+        cur_from = row.get(from_day, "")
+        t_from_vi = format_shift_time_vi(cur_from)
+
+        if t_from_vi == "nghỉ":
+            reply = f"Dạ chị Nhi ơi, {from_day_vi} này {emp} đang nghỉ không có ca. Chị muốn xếp ca mấy giờ vào {to_day_vi} cho {emp} dặn Joy làm liền nghen! 🥖"
+            action_summary = {"action": "move_shift_day_prompt", "emp": emp, "from_day": from_day, "to_day": to_day}
+            return True, reply, roster_rows, action_summary
+        else:
+            row[from_day] = ""
+            row[to_day] = cur_from
+            reply = f"Dạ rồi! Joy dời ca {from_day_vi} ({t_from_vi}) của {emp} sang {to_day_vi} rồi nghen! 🥖"
+            action_summary = {"action": "move_shift_day", "emp": emp, "from_day": from_day, "to_day": to_day, "shift_time": cur_from}
+            return True, reply, roster_rows, action_summary
+
+    elif action_type == "swap_shifts":
         emp1_raw = params.get("emp1", "")
         emp2_raw = params.get("emp2", "")
         emp1 = match_employee_name(emp1_raw, all_emp_names)
@@ -337,7 +436,11 @@ def execute_roster_action(
         return True, reply, roster_rows, {"action": "query_shift", "emp": emp, "day": day}
 
     elif action_type == "greeting":
-        reply = "Dạ Joy nghe nè chị Nhi!"
+        raw = str(params.get("raw", "")).lower()
+        if any(k in raw for k in ["sao không nói", "không nói gì", "im re", "alo ủa", "sao nó không nói"]):
+            reply = "Dạ Joy vẫn đang nghe rõ nè chị Nhi ơi! Chị dặn Joy sửa ca của bạn nào nghen! 🥖"
+        else:
+            reply = "Dạ Joy nghe nè chị Nhi! Chị dặn Joy sửa ca bạn nào nghen!"
         return True, reply, roster_rows, {"action": "greeting"}
 
     return False, "Dạ, Joy nghe nè chị.", roster_rows, {}
@@ -352,7 +455,8 @@ def parse_intent_rule_based(
     msg = user_message.lower().strip()
     all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows]
 
-    day = normalize_day(msg)
+    days = find_days_in_text(msg)
+    day = days[0] if days else None
     found_emps = find_employees_in_text(msg, all_emp)
     time_str = parse_time_range(msg)
 
@@ -367,9 +471,9 @@ def parse_intent_rule_based(
                 if emps_h:
                     prev_emp = emps_h[0]
             if not prev_day:
-                d_h = normalize_day(text_h)
+                d_h = find_days_in_text(text_h)
                 if d_h:
-                    prev_day = d_h
+                    prev_day = d_h[-1]
             if prev_emp and prev_day:
                 break
 
@@ -381,9 +485,13 @@ def parse_intent_rule_based(
         )
         if m_to:
             cand = m_to.group(1).strip()
-            matched_target = match_employee_name(cand, all_emp)
-            if matched_target and matched_target.lower() != found_emps[0].lower():
-                found_emps.append(matched_target)
+            matches = find_employees_in_text(cand, all_emp)
+            if matches and matches[0].lower() != found_emps[0].lower():
+                found_emps.append(matches[0])
+
+    # Case 0: Move shift from Day 1 to Day 2 for same employee
+    if len(found_emps) == 1 and len(days) >= 2 and any(k in msg for k in ["dời", "rời", "chuyển", "đổi", "sang", "qua"]):
+        return "move_shift_day", {"emp": found_emps[0], "from_day": days[0], "to_day": days[1]}
 
     # Case A: If user provided a time, but NO employee was mentioned in this turn:
     if time_str and not found_emps and prev_emp:
@@ -408,7 +516,7 @@ def parse_intent_rule_based(
             return "adjust_shift_hours", {"emp": emp, "day": day or prev_day or "Monday", "shift_time": time_str}
 
         # 3. Query / Prompt shift
-        if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "đổi", "thay đổi", "xem ca", "ca", "thêm", "thêm ca", "1k", "1 k"]):
+        if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "đổi", "thay đổi", "xem ca", "ca", "thêm", "thêm ca", "1k", "1 k", "làm ca", "làm", "xếp", "xếp ca"]):
             return "query_or_prompt_shift", {"emp": emp, "day": day or prev_day or "Monday"}
 
     # Case D: Preference instruction
@@ -423,9 +531,9 @@ def parse_intent_rule_based(
             "notes": user_message,
         }
 
-    # Case E: Greeting
-    if any(k in msg for k in ["hello", "chào", "joy ơi", "em ơi", "alo", "hi joy", "troy"]):
-        return "greeting", {}
+    # Case E: Greeting or mic check
+    if any(k in msg for k in ["hello", "chào", "joy ơi", "em ơi", "alo", "hi joy", "troy", "không nói gì", "sao không nói", "sao nó không nói", "im re"]):
+        return "greeting", {"raw": user_message}
 
     return None, {}
 
@@ -505,7 +613,7 @@ def call_gemini_with_tools(
     api_key: str,
     system_prompt: str,
     messages: List[Dict[str, Any]],
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "gemini-2.0-flash",
 ) -> Dict[str, Any]:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
     payload = {
@@ -520,7 +628,7 @@ def call_gemini_with_tools(
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=12) as resp:
+    with urllib.request.urlopen(req, timeout=5) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -584,8 +692,18 @@ QUY TẮC ĐÃ HỌC:
     final_reply = ""
     updated_roster = [dict(r) for r in roster_rows]
 
-    # Try Gemini LLM if API Key is configured
-    if api_key and api_key.strip():
+    # Priority 1: Instant deterministic local intent execution (< 2 milliseconds!)
+    action_name, action_params = parse_intent_rule_based(user_message, updated_roster, history)
+    if action_name:
+        action_params["raw"] = user_message
+        ok, reply, updated_roster, summary = execute_roster_action(action_name, action_params, updated_roster, db)
+        if ok:
+            final_reply = reply
+            if action_name not in ["greeting", "query_or_prompt_shift", "move_shift_day_prompt"]:
+                executed_actions.append(summary)
+
+    # Priority 2: If no direct rule matched and Gemini API key is configured, call Gemini
+    if not final_reply and api_key and api_key.strip():
         try:
             contents = []
             for h in history:
@@ -608,28 +726,15 @@ QUY TẮC ĐÃ HỌC:
                     text_part = next((p.get("text") for p in parts if "text" in p), "")
                     final_reply = text_part.strip()
         except Exception as e:
-            print(f"[Joy Assistant] Gemini API error, falling back to pattern matcher: {e}")
+            print(f"[Joy Assistant] Gemini API error: {e}")
 
-    # Fallback to smart rule-based parser if no action was executed yet
-    # (Catches cases where Gemini answered conversationally without triggering the tool, or no API key)
-    if not executed_actions:
-        action_name, action_params = parse_intent_rule_based(user_message, updated_roster, history)
-        if action_name in ["swap_shifts", "reassign_shift", "remove_shift", "adjust_shift_hours", "save_manager_preference"]:
-            ok, reply, updated_roster, summary = execute_roster_action(action_name, action_params, updated_roster, db)
-            if ok:
-                final_reply = reply
-                executed_actions.append(summary)
-        elif not final_reply:
-            if action_name == "query_or_prompt_shift":
-                ok, reply, updated_roster, summary = execute_roster_action(action_name, action_params, updated_roster, db)
-                final_reply = reply
-            else:
-                # Check if Joy already spoke recently to avoid repeating long text
-                last_joy_msg = next((h.get("message_text", "") for h in reversed(history) if h.get("speaker") == "Joy"), "")
-                if not last_joy_msg or len(history) <= 1:
-                    final_reply = "Dạ Joy nghe nè chị Nhi! Chị dặn Joy đổi ca bạn nào nghen!"
-                else:
-                    final_reply = "Dạ, Joy nghe nè chị."
+    # Fallback default response
+    if not final_reply:
+        last_joy_msg = next((h.get("message_text", "") for h in reversed(history) if h.get("speaker") == "Joy"), "")
+        if not last_joy_msg or len(history) <= 1:
+            final_reply = "Dạ Joy nghe nè chị Nhi! Chị dặn Joy sửa ca bạn nào nghen!"
+        else:
+            final_reply = "Dạ, Joy nghe nè chị."
 
     # Save to chat history
     if db:
