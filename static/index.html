@@ -1734,7 +1734,7 @@
           profilesCache = data.profiles || profilesCache;
           datasetsCache.employees = data.employees || datasetsCache.employees;
           populateAdminProfileSelect();
-          loadStaffTable();
+          loadEditableDataset('employees', 'empTableContainer');
           let msg = `🎉 Account created for ${name}!`;
           if (sendEmail) {
             if (data.email_sent) {
