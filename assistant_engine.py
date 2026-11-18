@@ -71,10 +71,13 @@ PHONETIC_ALIASES = {
     ],
     "Robert": ["robert", "rô bốt", "ro bốt", "rô bớt", "ro bớt", "rô béc", "rô-bớt", "ro béc", "rô-bét"],
     "Elizabeth": [
-        "elizabeth", "ê li za bét", "ê li za bet", "ê li", "ê-li", "li za", "lisa", "ly za",
-        "bét", "bết", "li sa", "lisa pham", "lisa phạm", "e li", "e-li", "li-za"
+        "elizabeth", "helizabeth", "ê li za bét", "ê li za bet", "ê li", "ê-li", "li za", "lisa", "ly za",
+        "bét", "bết", "li sa", "lisa pham", "lisa phạm", "e li", "e-li", "li-za", "hê li za bét"
     ],
-    "Anastasia": ["anastasia", "a na", "a-na", "a na sờ ta sia", "na sờ ta sia", "a na sta sia", "ana"],
+    "Anastasia": [
+        "anastasia", "natasha", "na ta sha", "anatashia", "na ta sia", "a na", "a-na",
+        "a na sờ ta sia", "na sờ ta sia", "a na sta sia", "ana"
+    ],
     "Milina": ["milina", "mi li na", "mi na", "mơ li na", "mơ na", "mi-na", "melina"],
     "Violet": ["violet", "vai ô lét", "vi ô lét", "vai let", "vi let", "vai-o-let"],
     "Aimi": ["aimi", "ai mi", "ai my", "ay mi"],
@@ -160,6 +163,36 @@ def format_shift_time_vi(shift_str: str) -> str:
     return s
 
 
+def parse_time_range(text: str) -> Optional[str]:
+    """Extracts a normalized shift time range e.g. '12:00 - 17:00' from natural Vietnamese."""
+    low = text.lower()
+    norm = re.sub(r"(\d{1,2})\s*giờ", r"\1h", low)
+    m = re.search(
+        r"(\d{1,2})(?:h(\d{2})?|:(\d{2}))?\s*(sáng|trưa|chiều|tối)?\s*(?:tới|đến|-)\s*(\d{1,2})(?:h(\d{2})?|:(\d{2}))?\s*(sáng|trưa|chiều|tối)?",
+        norm,
+    )
+    if m:
+        h1 = int(m.group(1))
+        m1 = m.group(2) or m.group(3) or "00"
+        p1 = m.group(4) or ""
+
+        h2 = int(m.group(5))
+        m2 = m.group(6) or m.group(7) or "00"
+        p2 = m.group(8) or ""
+
+        if p1 in ["chiều", "tối"] and h1 < 12:
+            h1 += 12
+        if p2 in ["chiều", "tối"] and h2 < 12:
+            h2 += 12
+        if not p1 and p2 in ["chiều", "tối"] and h1 < 12 and h1 > (h2 - 12):
+            h1 += 12
+
+        t1 = f"{h1:02d}:{m1}"
+        t2 = f"{h2:02d}:{m2}"
+        return f"{t1} - {t2}"
+    return None
+
+
 def execute_roster_action(
     action_type: str,
     params: Dict[str, Any],
@@ -206,11 +239,11 @@ def execute_roster_action(
         t2_vi = format_shift_time_vi(val2)
 
         if t2_vi == "nghỉ":
-            reply = f"Xong rồi nè chị Nhi! Joy đổi ca {day_vi} ({t1_vi}) của {emp1} qua cho {emp2} rồi nghen! 🥖"
+            reply = f"Dạ rồi! Joy đổi ca {day_vi} ({t1_vi}) của {emp1} qua cho {emp2} rồi nghen! 🥖"
         elif t1_vi == "nghỉ":
-            reply = f"Xong rồi nè chị Nhi! Joy đổi ca {day_vi} ({t2_vi}) của {emp2} qua cho {emp1} rồi nghen! 🥖"
+            reply = f"Dạ rồi! Joy đổi ca {day_vi} ({t2_vi}) của {emp2} qua cho {emp1} rồi nghen! 🥖"
         else:
-            reply = f"Xong rồi nè chị Nhi! Joy đổi ca {day_vi} giữa {emp1} ({t1_vi}) với {emp2} ({t2_vi}) rồi nghen! 🥖"
+            reply = f"Dạ rồi! Joy đổi ca {day_vi} giữa {emp1} ({t1_vi}) với {emp2} ({t2_vi}) rồi nghen! 🥖"
 
         action_summary = {"action": "swap_shifts", "emp1": emp1, "emp2": emp2, "day": day, "shift_emp1": val1, "shift_emp2": val2}
         return True, reply, roster_rows, action_summary
@@ -240,7 +273,7 @@ def execute_roster_action(
             to_row[day] = shift_val
 
         t_vi = format_shift_time_vi(shift_val)
-        reply = f"Dạ rồi chị Nhi! Ca {day_vi} {t_vi} Joy chuyển qua cho {to_emp} làm rồi nhen! ✨"
+        reply = f"Dạ rồi! Ca {day_vi} {t_vi} Joy chuyển qua cho {to_emp} làm rồi nhen! ✨"
         action_summary = {"action": "reassign_shift", "from_emp": from_emp, "to_emp": to_emp, "day": day, "shift_time": shift_val}
         return True, reply, roster_rows, action_summary
 
@@ -256,7 +289,7 @@ def execute_roster_action(
             row[day] = ""
 
         t_vi = format_shift_time_vi(old_val)
-        reply = f"Dạ rồi nè chị Nhi! {day_vi} này Joy cho {emp} nghỉ ({t_vi}) rồi nghen! 🌸"
+        reply = f"Dạ rồi! {day_vi} này Joy cho {emp} nghỉ rồi nghen! 🌸"
         action_summary = {"action": "remove_shift", "emp": emp, "day": day, "old_shift": old_val}
         return True, reply, roster_rows, action_summary
 
@@ -273,7 +306,7 @@ def execute_roster_action(
             row[day] = shift_time
 
         t_vi = format_shift_time_vi(shift_time)
-        reply = f"Xong liền nè chị Nhi! Ca {day_vi} của {emp} Joy cập nhật {t_vi} rồi nhen! 🌟"
+        reply = f"Dạ rồi! Ca {day_vi} của {emp} Joy cập nhật {t_vi} rồi nhen! 🌟"
         action_summary = {"action": action_type, "emp": emp, "day": day, "shift_time": shift_time}
         return True, reply, roster_rows, action_summary
 
@@ -288,7 +321,7 @@ def execute_roster_action(
             db.save_learned_rule("manager_voice_rule", emp_raw, day, shift_name, pref, weight, notes)
             db.save_memory_fact(f"rule_{emp_raw}_{day}_{shift_name}", "scheduling_preference", f"{notes} ({pref})")
 
-        reply = f"Joy nhớ rồi nè chị Nhi! Từ nay về sau {day_vi if day else 'mọi tuần'} Joy sẽ ưu tiên đúng ý chị dặn ({notes}) nghen! ❤️"
+        reply = f"Joy nhớ rồi nè chị Nhi! Từ nay Joy sẽ ưu tiên đúng ý chị dặn ({notes}) nghen! ❤️"
         return True, reply, roster_rows, {"action": "save_manager_preference", "notes": notes}
 
     elif action_type == "query_or_prompt_shift":
@@ -298,81 +331,99 @@ def execute_roster_action(
         cur_val = row.get(day, "") if row else ""
         if cur_val and cur_val.lower() not in ["off", "-", "nan", "none", ""]:
             t_vi = format_shift_time_vi(cur_val)
-            reply = f"Dạ chị Nhi, {day_vi} này {emp} đang có ca {t_vi} á. Chị muốn đổi ca này cho bạn nào, hay dời sang mấy giờ dặn Joy làm liền nghen! 🥖"
+            reply = f"Dạ {day_vi} {emp} đang làm {t_vi}. Chị muốn đổi hay sửa mấy giờ nè?"
         else:
-            reply = f"Dạ chị Nhi, {day_vi} này {emp} đang được nghỉ (OFF) nè. Chị muốn giao ca từ mấy giờ tới mấy giờ cho {emp} dặn Joy nghen! 🥖"
+            reply = f"Dạ {day_vi} {emp} đang nghỉ. Chị muốn thêm ca mấy giờ cho {emp} nghen?"
         return True, reply, roster_rows, {"action": "query_shift", "emp": emp, "day": day}
 
     elif action_type == "greeting":
-        reply = "Dạ Joy nghe nè chị Nhi! Chị xem bảng lịch trên màn hình rồi dặn Joy đổi ca cho bạn nào, thứ mấy với mấy giờ Joy sửa liền nghen! 🥖✨"
+        reply = "Dạ Joy nghe nè chị Nhi!"
         return True, reply, roster_rows, {"action": "greeting"}
 
-    return False, "Chị Nhi ơi, Joy chưa rõ lệnh này lắm á, chị dặn lại Joy nghen!", roster_rows, {}
+    return False, "Dạ, Joy nghe nè chị.", roster_rows, {}
 
 
-def parse_intent_rule_based(user_message: str, roster_rows: List[Dict[str, Any]]) -> Tuple[Optional[str], Dict[str, Any]]:
-    """Fast, deterministic fallback parser for roster commands in Vietnamese / Phan Rang dialect."""
+def parse_intent_rule_based(
+    user_message: str,
+    roster_rows: List[Dict[str, Any]],
+    history: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[Optional[str], Dict[str, Any]]:
+    """Fast, deterministic fallback parser with conversational context memory."""
     msg = user_message.lower().strip()
     all_emp = [str(r.get("Employee") or "").strip() for r in roster_rows]
 
     day = normalize_day(msg)
     found_emps = find_employees_in_text(msg, all_emp)
+    time_str = parse_time_range(msg)
+
+    # Extract previous context from recent turns
+    prev_emp = None
+    prev_day = None
+    if history:
+        for h in reversed(history):
+            text_h = h.get("message_text", "")
+            if not prev_emp:
+                emps_h = find_employees_in_text(text_h, all_emp)
+                if emps_h:
+                    prev_emp = emps_h[0]
+            if not prev_day:
+                d_h = normalize_day(text_h)
+                if d_h:
+                    prev_day = d_h
+            if prev_emp and prev_day:
+                break
 
     # If only 1 employee found, check if there is another employee after 'sang cho', 'qua cho', 'cho'
     if len(found_emps) == 1:
-        m_to = re.search(r"(?:sang\s+cho|qua\s+cho|cho)\s+([a-zA-Zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+)", msg)
+        m_to = re.search(
+            r"(?:sang\s+cho|qua\s+cho|cho)\s+([a-zA-Zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]+)",
+            msg,
+        )
         if m_to:
             cand = m_to.group(1).strip()
             matched_target = match_employee_name(cand, all_emp)
             if matched_target and matched_target.lower() != found_emps[0].lower():
                 found_emps.append(matched_target)
 
-    # 1. Two employees mentioned: swap or reassign
+    # Case A: If user provided a time, but NO employee was mentioned in this turn:
+    if time_str and not found_emps and prev_emp:
+        return "adjust_shift_hours", {"emp": prev_emp, "day": day or prev_day or "Monday", "shift_time": time_str}
+
+    # Case B: If two employees mentioned:
     if len(found_emps) >= 2:
+        if time_str and any(k in msg for k in ["thêm", "thêm ca", "1k", "1 k", "làm ca"]):
+            target_emp = found_emps[-1]
+            return "adjust_shift_hours", {"emp": target_emp, "day": day or prev_day or "Wednesday", "shift_time": time_str}
         return "swap_shifts", {"emp1": found_emps[0], "emp2": found_emps[1], "day": day or "Monday"}
 
-    # 2. One employee mentioned
+    # Case C: One employee mentioned
     if len(found_emps) == 1:
         emp = found_emps[0]
-        # Check remove / day off
+        # 1. Remove shift / day off
         if any(k in msg for k in ["nghỉ", "off", "bỏ ca", "xóa ca", "cho nghỉ", "bỏ", "xóa"]):
-            return "remove_shift", {"emp": emp, "day": day or "Saturday"}
+            return "remove_shift", {"emp": emp, "day": day or prev_day or "Saturday"}
 
-        # Check adjust hours
-        time_m = re.search(r"(\d{1,2}(?::\d{2}|h\d{0,2})?)\s*(?:tới|đến|-)\s*(\d{1,2}(?::\d{2}|h\d{0,2})?)", msg)
-        if time_m:
-            t1 = time_m.group(1).replace("h", ":").rstrip(":")
-            if ":" not in t1:
-                t1 += ":00"
-            if len(t1.split(":")[0]) == 1:
-                t1 = "0" + t1
+        # 2. Adjust hours / Add shift with time
+        if time_str:
+            return "adjust_shift_hours", {"emp": emp, "day": day or prev_day or "Monday", "shift_time": time_str}
 
-            t2 = time_m.group(2).replace("h", ":").rstrip(":")
-            if ":" not in t2:
-                t2 += ":00"
-            if len(t2.split(":")[0]) == 1:
-                t2 = "0" + t2
+        # 3. Query / Prompt shift
+        if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "đổi", "thay đổi", "xem ca", "ca", "thêm", "thêm ca", "1k", "1 k"]):
+            return "query_or_prompt_shift", {"emp": emp, "day": day or prev_day or "Monday"}
 
-            shift_time = f"{t1} - {t2}"
-            return "adjust_shift_hours", {"emp": emp, "day": day or "Monday", "shift_time": shift_time}
-
-        # Check change / edit / query shift for this employee
-        if any(k in msg for k in ["đổi ca", "thay đổi ca", "chỉnh ca", "đổi", "thay đổi", "xem ca", "ca"]):
-            return "query_or_prompt_shift", {"emp": emp, "day": day or "Monday"}
-
-    # 3. Preference instruction: "nhớ từ nay...", "sau này đừng xếp...", "ưu tiên..."
+    # Case D: Preference instruction
     if any(k in msg for k in ["nhớ", "sau này", "từ giờ", "từ nay", "ưu tiên"]):
         pref = "AVOID" if any(k in msg for k in ["đừng", "không", "hạn chế"]) else "PREFER"
         emp = found_emps[0] if found_emps else "All"
         return "save_manager_preference", {
             "emp": emp,
-            "day": day or "",
+            "day": day or prev_day or "",
             "preference": pref,
             "weight": -100 if pref == "AVOID" else 50,
             "notes": user_message,
         }
 
-    # 4. Greeting
+    # Case E: Greeting
     if any(k in msg for k in ["hello", "chào", "joy ơi", "em ơi", "alo", "hi joy", "troy"]):
         return "greeting", {}
 
@@ -548,13 +599,18 @@ QUY TẮC ĐÃ HỌC:
 
     # Fallback to smart rule-based parser if no API key or LLM didn't call tool
     if not final_reply:
-        action_name, action_params = parse_intent_rule_based(user_message, updated_roster)
+        action_name, action_params = parse_intent_rule_based(user_message, updated_roster, history)
         if action_name:
             ok, reply, updated_roster, summary = execute_roster_action(action_name, action_params, updated_roster, db)
             final_reply = reply
             executed_actions.append(summary)
         else:
-            final_reply = "Dạ chị Nhi ơi, Joy nghe rõ rồi nè! Chị muốn Joy đổi ca cho bạn nào, thứ mấy với mấy giờ dặn Joy nghen! 🥖"
+            # Check if Joy already spoke recently to avoid repeating long text
+            last_joy_msg = next((h.get("message_text", "") for h in reversed(history) if h.get("speaker") == "Joy"), "")
+            if not last_joy_msg or len(history) <= 1:
+                final_reply = "Dạ Joy nghe nè chị Nhi! Chị dặn Joy đổi ca bạn nào nghen!"
+            else:
+                final_reply = "Dạ, Joy nghe nè chị."
 
     # Save to chat history
     if db:

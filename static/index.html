@@ -2345,6 +2345,20 @@
       document.getElementById('btnJoyTts').classList.toggle('text-amber-300', joyTtsEnabled);
     }
 
+    const JOY_IGNORE_FILLERS = new Set([
+      'ơ', 'ơi', 'ơiee', 'ờ', 'ừ', 'ừm', 'nè', 'nên', 'vậy', 'hả', 'sao', 'thì', 'đâu', 'thế', 'ủa', 'rồi', 'alo', 'ok', 'cho nên', 'à'
+    ]);
+
+    function isMeaningfulSpeech(text) {
+      const clean = text.toLowerCase().trim().replace(/[.,?!]/g, '');
+      if (!clean) return false;
+      const words = clean.split(/\s+/);
+      if (words.length <= 2 && JOY_IGNORE_FILLERS.has(clean)) {
+        return false;
+      }
+      return words.length >= 2 || clean.length >= 6;
+    }
+
     function initJoyVoice() {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec) {
@@ -2361,7 +2375,7 @@
         document.getElementById('joyMicWave')?.classList.remove('hidden');
         document.getElementById('joyMicBtn')?.classList.add('ring-4', 'ring-rose-400');
         const tip = document.getElementById('joyListeningTip');
-        if (tip && !isJoySpeaking) tip.textContent = '🎙️ Joy đang lắng nghe chị Nhi nói nè...';
+        if (tip && !isJoySpeaking) tip.textContent = 'Joy đang lắng nghe nè... 🎙️';
       };
 
       joyRecognition.onresult = (event) => {
@@ -2386,9 +2400,14 @@
         }
 
         if (finalText && finalText.trim()) {
+          const trimmed = finalText.trim();
           if (liveBox) liveBox.classList.add('hidden');
-          document.getElementById('joyTextInput').value = finalText.trim();
-          sendJoyMessage(finalText.trim());
+          if (!isMeaningfulSpeech(trimmed)) {
+            // Keep quiet and wait patiently for user to complete sentence
+            return;
+          }
+          document.getElementById('joyTextInput').value = trimmed;
+          sendJoyMessage(trimmed);
         }
       };
 
@@ -2604,7 +2623,7 @@
         isJoySpeaking = false;
         if (isJoyModalOpen && !isJoyMuted) {
           const t = document.getElementById('joyListeningTip');
-          if (t) t.textContent = '🎙️ Joy đã nói xong, đang lắng nghe chị Nhi dặn tiếp nè!';
+          if (t) t.textContent = 'Joy đang lắng nghe nè... 🎙️';
           startJoyListening();
         } else {
           stopJoyVoice();
