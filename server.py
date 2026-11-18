@@ -151,7 +151,7 @@ OFFER OF EMPLOYMENT DETAILS
 • Employment Category: {clf}
 • Work Location: Brumby's Pakenham (Pakenham Central Marketplace)
 • Reporting To: Store Management / Bakery Owner
-• Applicable Award: Fast Food Industry Award / General Retail Industry Award
+• Applicable Modern Award: General Retail Industry Award 2020 [MA000004]
 
 ==================================================
 EMPLOYEE ONBOARDING & ROSTER PORTAL
