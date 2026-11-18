@@ -519,6 +519,40 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
     def do_HEAD(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if path.startswith("/static/"):
+            rel_path = path[len("/static/"):].lstrip("/")
+            file_path = os.path.join(STATIC_DIR, rel_path)
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                content_type = "application/octet-stream"
+                if file_path.endswith(".html"):
+                    content_type = "text/html; charset=utf-8"
+                elif file_path.endswith(".css"):
+                    content_type = "text/css"
+                elif file_path.endswith(".js"):
+                    content_type = "application/javascript"
+                elif file_path.endswith(".mp3"):
+                    content_type = "audio/mpeg"
+                elif file_path.endswith(".png"):
+                    content_type = "image/png"
+                elif file_path.endswith(".jpg") or file_path.endswith(".jpeg"):
+                    content_type = "image/jpeg"
+                elif file_path.endswith(".svg"):
+                    content_type = "image/svg+xml"
+
+                try:
+                    with open(file_path, "rb") as f:
+                        content = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", content_type)
+                    self.send_header("Content-Length", str(len(content)))
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Cache-Control", "public, max-age=86400")
+                    self.end_headers()
+                    self.wfile.write(content)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                return
+
         if path in ("/", "/index.html"):
             index_file = os.path.join(STATIC_DIR, "index.html")
             if os.path.exists(index_file):
@@ -538,6 +572,40 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         qs = parse_qs(parsed.query)
+
+        if path.startswith("/static/"):
+            rel_path = path[len("/static/"):].lstrip("/")
+            file_path = os.path.join(STATIC_DIR, rel_path)
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                content_type = "application/octet-stream"
+                if file_path.endswith(".html"):
+                    content_type = "text/html; charset=utf-8"
+                elif file_path.endswith(".css"):
+                    content_type = "text/css"
+                elif file_path.endswith(".js"):
+                    content_type = "application/javascript"
+                elif file_path.endswith(".mp3"):
+                    content_type = "audio/mpeg"
+                elif file_path.endswith(".png"):
+                    content_type = "image/png"
+                elif file_path.endswith(".jpg") or file_path.endswith(".jpeg"):
+                    content_type = "image/jpeg"
+                elif file_path.endswith(".svg"):
+                    content_type = "image/svg+xml"
+
+                try:
+                    with open(file_path, "rb") as f:
+                        content = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", content_type)
+                    self.send_header("Content-Length", str(len(content)))
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Cache-Control", "public, max-age=86400")
+                    self.end_headers()
+                    self.wfile.write(content)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+                return
 
         if path in ("/", "/index.html"):
             index_file = os.path.join(STATIC_DIR, "index.html")
@@ -747,14 +815,54 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
             if not text:
                 self._send_json(400, {"ok": False, "error": "No text provided"})
                 return
+
             clean_text = re.sub(r"[\U00010000-\U0010ffff]", "", text).strip()
             if not clean_text:
-                clean_text = "Dạ xong rồi nè chị Nhi"
-            tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={urllib.parse.quote(clean_text[:200])}&tl=vi&client=tw-ob"
-            try:
-                req = urllib.request.Request(tts_url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=6) as resp:
-                    audio_data = resp.read()
+                clean_text = "Dạ"
+
+            audio_dir = os.path.join(STATIC_DIR, "audio")
+            cache_dir = os.path.join(audio_dir, "cache")
+            os.makedirs(cache_dir, exist_ok=True)
+
+            target_file = None
+            low_text = clean_text.lower().strip()
+            if low_text in ("dạ!", "dạ", "da!", "da"):
+                da_file = os.path.join(audio_dir, "da.mp3")
+                if os.path.exists(da_file):
+                    target_file = da_file
+
+            if not target_file and any(k in low_text for k in ("joy tắt đây", "chào chị nhi")):
+                bye_file = os.path.join(audio_dir, "bye.mp3")
+                if os.path.exists(bye_file):
+                    target_file = bye_file
+
+            if not target_file:
+                import hashlib
+                h = hashlib.md5(clean_text.encode("utf-8")).hexdigest()
+                cached_path = os.path.join(cache_dir, f"{h}.mp3")
+                if os.path.exists(cached_path) and os.path.getsize(cached_path) > 500:
+                    target_file = cached_path
+                else:
+                    try:
+                        import asyncio
+                        import edge_tts
+                        asyncio.run(
+                            edge_tts.Communicate(
+                                clean_text,
+                                voice="vi-VN-HoaiMyNeural",
+                                rate="+16%",
+                                pitch="+25Hz"
+                            ).save(cached_path)
+                        )
+                        if os.path.exists(cached_path) and os.path.getsize(cached_path) > 500:
+                            target_file = cached_path
+                    except Exception as err:
+                        print(f"[TTS Server Error] {err}")
+
+            if target_file and os.path.exists(target_file):
+                try:
+                    with open(target_file, "rb") as f:
+                        audio_data = f.read()
                     self.send_response(200)
                     self.send_header("Content-Type", "audio/mpeg")
                     self.send_header("Content-Length", str(len(audio_data)))
@@ -762,16 +870,14 @@ class HappyRollyRequestHandler(BaseHTTPRequestHandler):
                     self.send_header("Accept-Ranges", "bytes")
                     self.send_header("Cache-Control", "public, max-age=86400")
                     self.end_headers()
-                    try:
-                        self.wfile.write(audio_data)
-                    except (BrokenPipeError, ConnectionResetError):
-                        pass
+                    self.wfile.write(audio_data)
                     return
-            except Exception as e:
-                self._send_json(500, {"ok": False, "error": str(e)})
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
                 return
 
-        self._send_json(404, {"ok": False, "error": "Not found"})
+            self._send_json(500, {"ok": False, "error": "TTS synthesis unavailable"})
+            return
 
     def do_POST(self):
         parsed = urlparse(self.path)
