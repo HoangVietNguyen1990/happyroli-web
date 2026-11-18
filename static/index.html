@@ -441,9 +441,9 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button onclick="openJoyModal()" class="bg-gradient-to-r from-forest to-emerald-600 hover:brightness-110 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2">
-              <span class="text-base">🎙️</span>
-              <span>Nói chuyện với Joy</span>
+            <button id="btnJoyMainToggle" onclick="toggleJoyModal()" class="bg-gradient-to-r from-forest to-emerald-600 hover:brightness-110 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2">
+              <span id="btnJoyMainIcon" class="text-base">🎙️</span>
+              <span id="btnJoyMainLabel">Nói chuyện với Joy</span>
             </button>
             <button onclick="openJoySettings()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs p-2.5 rounded-xl" title="Cấu hình Gemini API Key">
               ⚙️
@@ -820,7 +820,7 @@
     </section>
 
     <!-- ==================== JOY AI VOICE ASSISTANT MODAL ==================== -->
-    <div id="joyModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition">
+    <div id="joyModal" onclick="if(event.target===this)closeJoyModal()" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition">
       <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
         <!-- Header -->
         <div class="bg-gradient-to-r from-spruce via-forest to-emerald-800 text-white p-4 flex items-center justify-between">
@@ -863,15 +863,19 @@
 
         <!-- Voice & Text Input Toolbar -->
         <div class="p-3 bg-white border-t border-gray-200 space-y-2">
-          <!-- Big Interactive Microphone Button -->
-          <div class="flex items-center justify-center py-1">
-            <button id="joyMicBtn" onclick="toggleJoyVoice()" class="relative group flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-600 to-forest text-white shadow-lg hover:scale-105 active:scale-95 transition">
+          <!-- Big Interactive Microphone & Dedicated Mute Button -->
+          <div class="flex items-center justify-center gap-5 py-1">
+            <button id="joyMicBtn" onclick="toggleJoyVoice()" class="relative group flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-600 to-forest text-white shadow-lg hover:scale-105 active:scale-95 transition" title="Bật/Tắt Micro">
               <span id="joyMicWave" class="hidden absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75"></span>
               <span id="joyMicIcon" class="text-2xl relative z-10">🎙️</span>
             </button>
+            <button id="joyMuteBtn" onclick="toggleJoyMute()" class="flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 shadow-sm transition active:scale-95" title="Tắt mic tạm thời để nói chuyện với người khác">
+              <span id="joyMuteIcon" class="text-xl">🎙️</span>
+              <span id="joyMuteText" class="text-[10px] font-black mt-0.5 uppercase tracking-wide">Tắt Mic</span>
+            </button>
           </div>
           <div id="joyListeningTip" class="text-center text-[11px] text-gray-500 font-semibold">
-            Chạm micro để nói chuyện bằng giọng nói, hoặc gõ bên dưới nè:
+            Chạm micro để nói chuyện bằng giọng nói, hoặc chạm Tắt Mic khi nói chuyện riêng nghen!
           </div>
 
           <!-- Text Input Form -->
@@ -2191,17 +2195,79 @@
     // ==================== JOY AI VOICE ASSISTANT (PHAN RANG CO-PILOT) ====================
     let joyRecognition = null;
     let isJoyListening = false;
+    let isJoyMuted = false;
+    let isJoyModalOpen = false;
     let joyTtsEnabled = true;
 
+    function toggleJoyModal() {
+      if (isJoyModalOpen) {
+        closeJoyModal();
+      } else {
+        openJoyModal();
+      }
+    }
+
     function openJoyModal() {
+      isJoyModalOpen = true;
       document.getElementById('joyModal').classList.remove('hidden');
+      updateJoyToggleButton();
       loadJoyConfig();
+      if (!isJoyMuted) {
+        setTimeout(() => {
+          if (!isJoyListening && isJoyModalOpen) toggleJoyVoice();
+        }, 300);
+      }
     }
 
     function closeJoyModal() {
+      isJoyModalOpen = false;
       stopJoyVoice();
       if (window.speechSynthesis) window.speechSynthesis.cancel();
       document.getElementById('joyModal').classList.add('hidden');
+      updateJoyToggleButton();
+    }
+
+    function updateJoyToggleButton() {
+      const btn = document.getElementById('btnJoyMainToggle');
+      const icon = document.getElementById('btnJoyMainIcon');
+      const label = document.getElementById('btnJoyMainLabel');
+      if (!btn) return;
+
+      if (isJoyModalOpen) {
+        btn.className = "bg-gradient-to-r from-rose-600 to-amber-700 hover:brightness-110 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2";
+        if (icon) icon.textContent = "✕";
+        if (label) label.textContent = "Đóng / Xong việc với Joy";
+      } else {
+        btn.className = "bg-gradient-to-r from-forest to-emerald-600 hover:brightness-110 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2";
+        if (icon) icon.textContent = "🎙️";
+        if (label) label.textContent = "Nói chuyện với Joy";
+      }
+    }
+
+    function toggleJoyMute() {
+      isJoyMuted = !isJoyMuted;
+      const muteBtn = document.getElementById('joyMuteBtn');
+      const muteIcon = document.getElementById('joyMuteIcon');
+      const muteText = document.getElementById('joyMuteText');
+      const tip = document.getElementById('joyListeningTip');
+
+      if (isJoyMuted) {
+        stopJoyVoice();
+        if (muteBtn) {
+          muteBtn.className = "flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl bg-rose-100 hover:bg-rose-200 border-2 border-rose-400 text-rose-700 shadow-md transition active:scale-95 ring-2 ring-rose-400";
+        }
+        if (muteIcon) muteIcon.textContent = "🔇";
+        if (muteText) muteText.textContent = "ĐANG TẮT MIC";
+        if (tip) tip.textContent = "🔇 Mic đang tắt để chị Nhi nói chuyện riêng nè. Toàn bộ hội thoại và Roster vẫn giữ nguyên vẹn, chạm Bật Mic khi nào sẵn sàng dặn Joy tiếp nghen!";
+      } else {
+        if (muteBtn) {
+          muteBtn.className = "flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 shadow-sm transition active:scale-95";
+        }
+        if (muteIcon) muteIcon.textContent = "🎙️";
+        if (muteText) muteText.textContent = "TẮT MIC";
+        if (tip) tip.textContent = "Chạm micro để nói chuyện bằng giọng nói, hoặc gõ bên dưới nè:";
+        toggleJoyVoice();
+      }
     }
 
     function openJoySettings() {
@@ -2292,6 +2358,15 @@
     }
 
     function toggleJoyVoice() {
+      if (isJoyMuted) {
+        isJoyMuted = false;
+        const muteBtn = document.getElementById('joyMuteBtn');
+        const muteIcon = document.getElementById('joyMuteIcon');
+        const muteText = document.getElementById('joyMuteText');
+        if (muteBtn) muteBtn.className = "flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 shadow-sm transition active:scale-95";
+        if (muteIcon) muteIcon.textContent = "🎙️";
+        if (muteText) muteText.textContent = "TẮT MIC";
+      }
       if (!joyRecognition) initJoyVoice();
       if (!joyRecognition) return;
       if (isJoyListening) {
