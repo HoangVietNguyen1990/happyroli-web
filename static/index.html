@@ -2209,6 +2209,7 @@
     let isJoySpeaking = false;
     let isJoyCollapsed = false;
     let currentJoyAudio = null;
+    let joyAckAudio = null;
 
     function toggleJoyModal() {
       if (isJoyModalOpen) {
@@ -2223,6 +2224,11 @@
       document.getElementById('joyModal').classList.remove('hidden');
       updateJoyToggleButton();
       loadJoyConfig();
+      if (!joyAckAudio) {
+        joyAckAudio = new Audio('/api/assistant/tts?text=' + encodeURIComponent('Dạ!'));
+        joyAckAudio.preload = 'auto';
+        try { joyAckAudio.load(); } catch(e){}
+      }
       const tip = document.getElementById('joyListeningTip');
       if (tip) tip.textContent = 'Chạm micro 🎙️ để nói chuyện bằng giọng nói, hoặc gõ bên dưới nghen!';
     }
@@ -2514,8 +2520,50 @@
       chatLog.scrollTop = chatLog.scrollHeight;
     }
 
+    function speakInstantAck() {
+      if (!isJoyModalOpen || !joyTtsEnabled || isJoyMuted) return;
+      isJoySpeaking = true;
+      if (joyRecognition) {
+        try { joyRecognition.abort(); } catch(e){}
+      }
+      const tip = document.getElementById('joyListeningTip');
+      if (tip) tip.textContent = '👧🏻 Dạ! Joy đang làm nè...';
+
+      let fallbackDone = false;
+      const doFallback = () => {
+        if (fallbackDone) return;
+        fallbackDone = true;
+        if (window.speechSynthesis) {
+          try {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance('Dạ!');
+            u.lang = 'vi-VN';
+            u.rate = 1.35;
+            u.pitch = 1.35;
+            window.speechSynthesis.speak(u);
+          } catch(e){}
+        }
+      };
+
+      if (!joyAckAudio) {
+        joyAckAudio = new Audio('/api/assistant/tts?text=' + encodeURIComponent('Dạ!'));
+        joyAckAudio.preload = 'auto';
+      }
+
+      try {
+        joyAckAudio.currentTime = 0;
+        const p = joyAckAudio.play();
+        if (p && typeof p.then === 'function') {
+          p.catch(() => doFallback());
+        }
+      } catch(e) {
+        doFallback();
+      }
+    }
+
     async function sendJoyMessage(text) {
       if (!text || !text.trim()) return;
+      speakInstantAck();
       appendJoyChat('manager', text);
       document.getElementById('joyTextInput').value = '';
 
@@ -2594,6 +2642,9 @@
 
     function speakJoyReply(text) {
       if (!isJoyModalOpen || !joyTtsEnabled) return;
+      if (joyAckAudio) {
+        try { joyAckAudio.pause(); joyAckAudio.currentTime = 0; } catch(e){}
+      }
       if (currentJoyAudio) {
         try { currentJoyAudio.pause(); currentJoyAudio.currentTime = 0; } catch(e){}
         currentJoyAudio = null;

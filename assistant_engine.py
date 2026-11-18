@@ -368,7 +368,7 @@ def execute_roster_action(
         else:
             row[from_day] = ""
             row[to_day] = cur_from
-            reply = f"Dạ rồi! Joy dời ca {from_day_vi} ({t_from_vi}) của {emp} sang {to_day_vi} rồi nghen! 🥖"
+            reply = f"Xong chị ơi! Joy dời ca {from_day_vi} ({t_from_vi}) của {emp} sang {to_day_vi} rồi nghen! 🥖"
             action_summary = {"action": "move_shift_day", "emp": emp, "from_day": from_day, "to_day": to_day, "shift_time": cur_from}
             return True, reply, roster_rows, action_summary
 
@@ -396,11 +396,11 @@ def execute_roster_action(
         t2_vi = format_shift_time_vi(val2)
 
         if t2_vi == "nghỉ":
-            reply = f"Dạ rồi! Joy đổi ca {day_vi} ({t1_vi}) của {emp1} qua cho {emp2} rồi nghen! 🥖"
+            reply = f"Xong chị ơi! Joy đổi ca {day_vi} ({t1_vi}) của {emp1} qua cho {emp2} rồi nghen! 🥖"
         elif t1_vi == "nghỉ":
-            reply = f"Dạ rồi! Joy đổi ca {day_vi} ({t2_vi}) của {emp2} qua cho {emp1} rồi nghen! 🥖"
+            reply = f"Xong chị ơi! Joy đổi ca {day_vi} ({t2_vi}) của {emp2} qua cho {emp1} rồi nghen! 🥖"
         else:
-            reply = f"Dạ rồi! Joy đổi ca {day_vi} giữa {emp1} ({t1_vi}) với {emp2} ({t2_vi}) rồi nghen! 🥖"
+            reply = f"Xong chị ơi! Joy đổi ca {day_vi} giữa {emp1} ({t1_vi}) với {emp2} ({t2_vi}) rồi nghen! 🥖"
 
         action_summary = {"action": "swap_shifts", "emp1": emp1, "emp2": emp2, "day": day, "shift_emp1": val1, "shift_emp2": val2}
         return True, reply, roster_rows, action_summary
@@ -430,7 +430,7 @@ def execute_roster_action(
             to_row[day] = shift_val
 
         t_vi = format_shift_time_vi(shift_val)
-        reply = f"Dạ rồi! Ca {day_vi} {t_vi} Joy chuyển qua cho {to_emp} làm rồi nhen! ✨"
+        reply = f"Xong chị ơi! Ca {day_vi} {t_vi} Joy chuyển qua cho {to_emp} làm rồi nhen! ✨"
         action_summary = {"action": "reassign_shift", "from_emp": from_emp, "to_emp": to_emp, "day": day, "shift_time": shift_val}
         return True, reply, roster_rows, action_summary
 
@@ -446,7 +446,7 @@ def execute_roster_action(
             row[day] = ""
 
         t_vi = format_shift_time_vi(old_val)
-        reply = f"Dạ rồi! {day_vi} này Joy cho {emp} nghỉ rồi nghen! 🌸"
+        reply = f"Xong chị ơi! {day_vi} này Joy cho {emp} nghỉ rồi nghen! 🌸"
         action_summary = {"action": "remove_shift", "emp": emp, "day": day, "old_shift": old_val}
         return True, reply, roster_rows, action_summary
 
@@ -463,7 +463,7 @@ def execute_roster_action(
             row[day] = shift_time
 
         t_vi = format_shift_time_vi(shift_time)
-        reply = f"Dạ rồi! Ca {day_vi} của {emp} Joy cập nhật {t_vi} rồi nhen! 🌟"
+        reply = f"Xong chị ơi! Ca {day_vi} của {emp} Joy cập nhật {t_vi} rồi nhen! 🌟"
         action_summary = {"action": action_type, "emp": emp, "day": day, "shift_time": shift_time}
         return True, reply, roster_rows, action_summary
 
@@ -478,7 +478,7 @@ def execute_roster_action(
             db.save_learned_rule("manager_voice_rule", emp_raw, day, shift_name, pref, weight, notes)
             db.save_memory_fact(f"rule_{emp_raw}_{day}_{shift_name}", "scheduling_preference", f"{notes} ({pref})")
 
-        reply = f"Joy nhớ rồi nè chị Nhi! Từ nay Joy sẽ ưu tiên đúng ý chị dặn ({notes}) nghen! ❤️"
+        reply = f"Xong chị ơi! Joy lưu ý dặn của chị ({notes}) rồi nghen! ❤️"
         return True, reply, roster_rows, {"action": "save_manager_preference", "notes": notes}
 
     elif action_type == "query_or_prompt_shift":
@@ -551,6 +551,18 @@ def parse_intent_rule_based(
             matches = find_employees_in_text(cand, all_emp)
             if matches and matches[0].lower() != found_emps[0].lower():
                 found_emps.append(matches[0])
+
+    # Priority: Preference instruction (e.g. "Dặn Joy nhớ...", "Sau này đừng xếp...", "Từ nay ưu tiên...")
+    if any(k in msg for k in ["dặn joy", "dặn em", "nhớ là", "sau này", "từ giờ", "từ nay", "nhớ nghen", "nhớ nhen", "nhớ nha"]):
+        pref = "AVOID" if any(k in msg for k in ["đừng", "không", "hạn chế", "hông thích", "ko thích"]) else "PREFER"
+        emp = found_emps[0] if found_emps else "All"
+        return "save_manager_preference", {
+            "emp": emp,
+            "day": day or prev_day or "",
+            "preference": pref,
+            "weight": -100 if pref == "AVOID" else 50,
+            "notes": user_message,
+        }
 
     # Case 0: Move shift from Day 1 to Day 2 for same employee
     if len(found_emps) == 1 and len(days) >= 2 and any(k in msg for k in ["dời", "rời", "chuyển", "đổi", "sang", "qua"]):
@@ -753,7 +765,8 @@ PHONG CÁCH GIAO TIẾP PHAN RANG CỦA JOY:
   2. Thứ mấy
   3. Mấy giờ tới mấy giờ cụ thể
   4. Tên ca làm việc nếu có.
-- Ví dụ: "Xong rồi nè chị Nhi! Joy đổi ca thứ Tư từ 6h sáng tới 2h chiều của Shaelyn qua cho Milina rồi nghen."
+- Ví dụ: "Xong chị ơi! Joy đổi ca thứ Tư từ 6h sáng tới 2h chiều của Shaelyn qua cho Milina rồi nghen."
+- BẮT BUỘC: Khi hoàn thành một thao tác đổi ca, xóa ca, thêm ca hay điều chỉnh giờ, câu trả lời của Joy PHẢI bắt đầu bằng cụm từ: "Xong chị ơi!".
 
 DANH SÁCH NHÂN VIÊN TIỆM: {emp_summary}
 
